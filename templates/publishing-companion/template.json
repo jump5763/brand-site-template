@@ -1,0 +1,16 @@
+{
+  "id": "publishing-companion",
+  "templateVersion": "1.0.0",
+  "name": "Publishing Companion",
+  "description": "Isolated new-site3 copy for full subtree replacement acceptance.",
+  "tags": [],
+  "formatVersion": 1,
+  "projectRoot": ".",
+  "contentFile": "src/site-schema/current.json",
+  "preview": {
+    "pagePath": "/",
+    "cover": "previews/cover.png",
+    "width": 1600,
+    "height": 900
+  }
+}

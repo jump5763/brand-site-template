@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "site.footer",
+  "type": "site",
+  "variant": "footer",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Site Footer",
+    "description": "Site footer with a brand statement h2, store addresses, opening hours, explore links and contact details.",
+    "useWhen": ["A page needs the closing footer with store, hours, contact and navigation information"],
+    "avoidWhen": ["The content is a mid-page information band (use a locations or story section)"],
+    "rendering": "server"
+  }
+}

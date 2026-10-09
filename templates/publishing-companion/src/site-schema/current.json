@@ -1,0 +1,1051 @@
+{
+  "siteId": "root-and-grain",
+  "siteUrl": "https://rootandgrain.com",
+  "theme": {
+    "fonts": { "heading": "System Sans", "typography": "System Sans" },
+    "colors": {
+      "background": "#FAF7F1",
+      "foreground": "#24292A",
+      "card": "#FFFFFF",
+      "cardForeground": "#24292A",
+      "popover": "#FFFFFF",
+      "popoverForeground": "#24292A",
+      "primary": "#14453D",
+      "primaryForeground": "#FAF7F1",
+      "secondary": "#E9EEE6",
+      "secondaryForeground": "#14453D",
+      "muted": "#EFEDE4",
+      "mutedForeground": "#5C6A65",
+      "accent": "#DEE8DF",
+      "accentForeground": "#14453D",
+      "destructive": "#B3261E",
+      "destructiveForeground": "#FFFFFF",
+      "border": "#E4E1D7",
+      "input": "#E4E1D7",
+      "ring": "#14453D"
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "path": "/",
+      "metadata": {
+        "title": "Root & Grain | Fresh Salads & Grain Bowls",
+        "description": "Root & Grain is a fast-casual kitchen serving made-to-order salads, warm grain bowls and cold-pressed drinks with organic greens from 38 family farms. Order pickup or delivery.",
+        "canonicalPath": "/",
+        "robots": { "index": true, "follow": true }
+      },
+      "sections": [
+        {
+          "id": "header",
+          "type": "site",
+          "variant": "header",
+          "content": {
+            "brandName": "Root & Grain",
+            "brandTagline": "Fresh Kitchen",
+            "brandTarget": { "kind": "page", "pageId": "home", "fragment": "top" },
+            "navigationLabel": "Main navigation",
+            "navigation": [
+              { "id": "home", "label": "Home", "target": { "kind": "page", "pageId": "home", "fragment": "top" } },
+              { "id": "menu", "label": "Menu", "target": { "kind": "page", "pageId": "menu" } },
+              { "id": "order", "label": "Order Online", "target": { "kind": "page", "pageId": "home", "fragment": "order" } },
+              { "id": "locations", "label": "Locations", "target": { "kind": "page", "pageId": "home", "fragment": "locations" } },
+              { "id": "about", "label": "About Us", "target": { "kind": "page", "pageId": "home", "fragment": "about" } },
+              { "id": "contact", "label": "Contact Us", "target": { "kind": "page", "pageId": "home", "fragment": "contact" } }
+            ],
+            "action": { "label": "Start Your Order", "target": { "kind": "page", "pageId": "menu" } }
+          }
+        },
+        {
+          "id": "hero",
+          "type": "home",
+          "variant": "hero",
+          "content": {
+            "eyebrow": "Fast-casual, farm-forward",
+            "title": "Salads and grain bowls built from real farms",
+            "description": "Every bowl is tossed to order with organic greens, warm whole grains and dressings we press in-house. No seed oils, no shortcuts, ready in about six minutes.",
+            "media": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=2400&q=80",
+              "alt": "Fresh salad bowl with grilled chicken, avocado, cherry tomatoes and leafy greens photographed from above",
+              "width": 2400,
+              "height": 1600
+            },
+            "primaryAction": { "label": "Start Your Order", "target": { "kind": "page", "pageId": "menu" } },
+            "secondaryAction": { "label": "Find a Kitchen", "target": { "kind": "page", "pageId": "home", "fragment": "locations" } },
+            "highlights": [
+              { "id": "greens", "value": "100%", "label": "Organic greens" },
+              { "id": "farms", "value": "38", "label": "Local farm partners" },
+              { "id": "minutes", "value": "6 min", "label": "Average pickup time" }
+            ],
+            "scrollHint": "Explore the menu"
+          }
+        },
+        {
+          "id": "marquee",
+          "type": "marquee",
+          "variant": "ticker",
+          "content": {
+            "label": "What we stand for",
+            "items": [
+              "Organic greens harvested this week",
+              "Grain bowls made to order",
+              "Dressings pressed in-house",
+              "Zero seed oils",
+              "Compostable packaging",
+              "38 family farm partners",
+              "Pickup ready in about six minutes"
+            ]
+          }
+        },
+        {
+          "id": "seasonal",
+          "type": "menu",
+          "variant": "seasonal",
+          "content": {
+            "eyebrow": "Seasonal now",
+            "title": "New dishes on the board this season",
+            "description": "Our chefs write a short seasonal list every eight weeks around what the farms are actually harvesting. When it is gone, it is gone.",
+            "action": { "label": "See the Full Menu", "target": { "kind": "page", "pageId": "menu" } },
+            "dishes": [
+              {
+                "id": "charred-corn-cotija",
+                "name": "Charred Corn & Cotija Bowl",
+                "description": "Charred sweet corn, cotija, avocado, warm farro, lime crema and plenty of cilantro.",
+                "price": 16.25,
+                "calories": 640,
+                "badge": "New",
+                "tags": ["Vegetarian", "Seasonal"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Charred corn and cotija cheese grain bowl with avocado and herbs",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "stone-fruit-burrata",
+                "name": "Stone Fruit & Burrata Salad",
+                "description": "Ripe peaches, burrata, arugula, prosciutto, basil oil and a torn sourdough crouton.",
+                "price": 15.75,
+                "calories": 520,
+                "badge": "Limited",
+                "tags": ["Seasonal"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Stone fruit and burrata salad with arugula and basil oil",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "miso-sweet-potato",
+                "name": "Miso Sweet Potato Bowl",
+                "description": "Forbidden rice, roasted sweet potato, broccoli, red cabbage, miso ginger dressing and sesame.",
+                "price": 14.5,
+                "calories": 580,
+                "badge": "Chef's Pick",
+                "tags": ["Vegan", "Dairy-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Miso roasted sweet potato bowl with broccoli and red cabbage",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "basil-lemonade-spritz",
+                "name": "Basil Lemonade Spritz",
+                "description": "House lemonade, fresh basil, sparkling water and a touch of light agave.",
+                "price": 5.25,
+                "calories": 110,
+                "badge": "New",
+                "tags": ["Vegan", "Dairy-Free", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Sparkling basil lemonade served over ice in a tall glass",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "harvest-grain-bowl",
+                "name": "Harvest Grain Bowl",
+                "description": "Brown rice, roasted squash, kale, dried cranberry, pepitas and maple dijon vinaigrette.",
+                "price": 14.75,
+                "calories": 590,
+                "badge": "Seasonal Favourite",
+                "tags": ["Vegan", "Gluten-Free", "Dairy-Free", "Seasonal"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Harvest grain bowl with roasted squash, kale and pumpkin seeds",
+                  "width": 1600,
+                  "height": 1200
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "ingredients",
+          "type": "ingredients",
+          "variant": "fresh",
+          "content": {
+            "eyebrow": "Sourcing",
+            "title": "Grown close to home, served the same week",
+            "description": "We buy from 38 family farms, roast our grains in small batches and press every dressing in the kitchen. Nothing arrives frozen and nothing sits in a warehouse.",
+            "items": [
+              {
+                "id": "greens",
+                "title": "Organic greens",
+                "description": "Lettuce, kale and herbs harvested within 48 hours of dressing your bowl.",
+                "icon": "leaf",
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1519996529931-28324d5a630e?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Crates of freshly harvested organic leafy greens and vegetables",
+                  "width": 1200,
+                  "height": 960
+                }
+              },
+              {
+                "id": "grains",
+                "title": "Whole grains",
+                "description": "Farro, quinoa and wild rice cooked in small batches every morning.",
+                "icon": "wheat",
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Whole grains and freshly baked bread on a wooden counter",
+                  "width": 1200,
+                  "height": 960
+                }
+              },
+              {
+                "id": "dressings",
+                "title": "Cold-pressed dressings",
+                "description": "Olive oil, citrus and fresh herbs pressed in-house. No seed oils, no stabilisers.",
+                "icon": "droplet",
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1494859802809-d069c3b71a8a?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Fresh herbs and olive oil for house-pressed salad dressings",
+                  "width": 1200,
+                  "height": 960
+                }
+              },
+              {
+                "id": "packaging",
+                "title": "Compostable everything",
+                "description": "Bowls, cutlery and bags certified compostable at every one of our stores.",
+                "icon": "recycle",
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Bright kitchen counter with reusable bowls ready for takeaway orders",
+                  "width": 1200,
+                  "height": 960
+                }
+              }
+            ],
+            "note": "Menus change with the harvest. Nutrition and allergen details are available at every store."
+          }
+        },
+        {
+          "id": "about",
+          "type": "story",
+          "variant": "about",
+          "content": {
+            "eyebrow": "About us",
+            "title": "A kitchen built on the idea that fast food can be real food",
+            "description": "Root & Grain opened its first store in 2014 with four burners, one salad bowl and a promise to pay farms fairly.",
+            "body": [
+              "We started because lunch in America had become a choice between fast and good. Our founders, a chef and a vegetable farmer, believed the two could be the same thing: a bowl of greens somebody grew with care, finished in a kitchen that respects it.",
+              "Today we cook from scratch in every store. Grains are roasted each morning, dressings are pressed the same day they are served, and 38 family farms across three states plan their plantings around what our guests actually order."
+            ],
+            "media": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1600&q=80",
+              "alt": "Warm dining room of the first Root & Grain kitchen with wooden tables",
+              "width": 1600,
+              "height": 2000
+            },
+            "secondaryMedia": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1200&q=80",
+              "alt": "Open kitchen where cooks assemble salads and grain bowls to order",
+              "width": 1200,
+              "height": 1200
+            },
+            "stats": [
+              { "id": "farms", "value": "38", "label": "Family farm partners" },
+              { "id": "scratch", "value": "100%", "label": "Cooked from scratch" },
+              { "id": "stores", "value": "3", "label": "Kitchens in three states" }
+            ],
+            "action": { "label": "Explore the Menu", "target": { "kind": "page", "pageId": "menu" } }
+          }
+        },
+        {
+          "id": "reviews",
+          "type": "testimonials",
+          "variant": "guests",
+          "content": {
+            "eyebrow": "Guest reviews",
+            "title": "What people say after lunch",
+            "description": "Ratings from guests who ordered pickup or delivery in the last 90 days.",
+            "reviews": [
+              {
+                "id": "maya-r",
+                "quote": "The greens actually taste like something. I order the Guacamole Greens twice a week and it is still the best salad within walking distance of my office.",
+                "name": "Maya R.",
+                "detail": "Santa Monica, CA",
+                "favorite": "Usually orders: Guacamole Greens",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Maya R., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "daniel-o",
+                "quote": "Pickup in six minutes, no seed oils, and the farro is warm when I get back to my desk. It replaced the sandwich shop I used for years.",
+                "name": "Daniel O.",
+                "detail": "Austin, TX",
+                "favorite": "Usually orders: Warm Farro & Mushroom",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Daniel O., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "priya-n",
+                "quote": "As someone who eats gluten free, I can build a bowl without losing any flavour. The staff knows the menu and swaps without making it a thing.",
+                "name": "Priya N.",
+                "detail": "Brooklyn, NY",
+                "favorite": "Usually orders: Sesame Salmon Bowl",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Priya N., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "carlos-m",
+                "quote": "We order the catering trays for team lunches. Twenty people fed, everything labelled, nothing left over and no complaints about salad for once.",
+                "name": "Carlos M.",
+                "detail": "South Congress, TX",
+                "favorite": "Usually orders: Catering trays for 20",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Carlos M., a catering guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "noor-a",
+                "quote": "You can see the whole prep line, so nothing is a mystery. I built a bowl around the chicken pesto quinoa and it has been my Tuesday lunch ever since.",
+                "name": "Noor A.",
+                "detail": "Williamsburg, NY",
+                "favorite": "Usually orders: Chicken Pesto Quinoa",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Noor A., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "tomas-b",
+                "quote": "Four stars only because I wish the South Congress kitchen opened before eleven. The shrimp caesar itself is consistent every single time, and the greens never arrive wilted.",
+                "name": "Tomás B.",
+                "detail": "South Congress, TX",
+                "favorite": "Usually orders: Spicy Shrimp Caesar",
+                "rating": 4,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Tomás B., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "elaine-k",
+                "quote": "Ordering ahead for delivery is the part I did not expect to love. Dressing comes on the side, the cobb is cold when it should be, and it still looks like the photo.",
+                "name": "Elaine K.",
+                "detail": "Santa Monica, CA",
+                "favorite": "Usually orders: Harvest Cobb",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Elaine K., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              },
+              {
+                "id": "jordan-p",
+                "quote": "Weeknight dinner for four that everyone eats without negotiation. The sweet potato bowl keeps the kids happy and I am not cooking two meals.",
+                "name": "Jordan P.",
+                "detail": "Brooklyn, NY",
+                "favorite": "Usually orders: Miso Sweet Potato Bowl",
+                "rating": 5,
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
+                  "alt": "Portrait of Jordan P., a regular guest",
+                  "width": 400,
+                  "height": 400
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "order",
+          "type": "order",
+          "variant": "cta",
+          "content": {
+            "eyebrow": "Order online",
+            "title": "Skip the line and we will have it waiting",
+            "description": "Build your bowl online, choose pickup or delivery, and we start tossing when you are five minutes away.",
+            "primaryAction": { "label": "Start Your Order", "target": { "kind": "page", "pageId": "menu" } },
+            "secondaryAction": { "label": "Find a Kitchen", "target": { "kind": "page", "pageId": "home", "fragment": "locations" } },
+            "perks": [
+              "Ready in about six minutes",
+              "Free pickup at all three stores",
+              "Delivery within three miles",
+              "Catering trays for 10 to 200"
+            ],
+            "note": "Pickup orders are held for 30 minutes. Catering orders need 24 hours notice."
+          }
+        },
+        {
+          "id": "locations",
+          "type": "locations",
+          "variant": "branches",
+          "content": {
+            "eyebrow": "Locations & hours",
+            "title": "Three kitchens, open seven days a week",
+            "description": "Find your nearest store for pickup, delivery and catering, or call ahead and we will have your order on the shelf.",
+            "map": {
+              "query": "1447 3rd Street Promenade, Santa Monica, CA 90401",
+              "zoom": 14,
+              "title": "Map of Root & Grain on 3rd Street Promenade in Santa Monica"
+            },
+            "branches": [
+              {
+                "id": "santa-monica",
+                "name": "Santa Monica",
+                "addressLine": "1447 3rd Street Promenade",
+                "cityLine": "Santa Monica, CA 90401",
+                "phone": "(310) 555-0142",
+                "hours": [
+                  "Mon - Thu 10:30 AM - 9:00 PM",
+                  "Fri - Sat 10:30 AM - 10:00 PM",
+                  "Sun 11:00 AM - 8:00 PM"
+                ],
+                "services": ["Pickup", "Delivery", "Outdoor Seating", "Catering"]
+              },
+              {
+                "id": "south-congress",
+                "name": "South Congress",
+                "addressLine": "1204 South Congress Avenue",
+                "cityLine": "Austin, TX 78704",
+                "phone": "(512) 555-0187",
+                "hours": [
+                  "Mon - Thu 10:30 AM - 9:00 PM",
+                  "Fri - Sat 10:30 AM - 10:00 PM",
+                  "Sun 11:00 AM - 8:00 PM"
+                ],
+                "services": ["Pickup", "Delivery", "Patio", "Catering"]
+              },
+              {
+                "id": "williamsburg",
+                "name": "Williamsburg",
+                "addressLine": "88 Berry Street",
+                "cityLine": "Brooklyn, NY 11249",
+                "phone": "(718) 555-0193",
+                "hours": [
+                  "Mon - Thu 10:30 AM - 9:00 PM",
+                  "Fri - Sat 10:30 AM - 10:00 PM",
+                  "Sun 11:00 AM - 8:00 PM"
+                ],
+                "services": ["Pickup", "Delivery", "Catering"]
+              }
+            ],
+            "note": "Holiday hours may differ by store. Ask any team member about allergen swaps and gluten-free options."
+          }
+        },
+        {
+          "id": "contact",
+          "type": "site",
+          "variant": "footer",
+          "content": {
+            "brandName": "Root & Grain",
+            "headline": "Real food, made fast, sourced close to home.",
+            "description": "Root & Grain is a fast-casual kitchen serving salads, grain bowls and cold-pressed drinks from 38 family farms across three states.",
+            "columnTitles": {
+              "stores": "Visit Us",
+              "hours": "Kitchen Hours",
+              "explore": "Explore",
+              "contact": "Get in Touch"
+            },
+            "stores": [
+              {
+                "id": "santa-monica",
+                "name": "Santa Monica",
+                "addressLine": "1447 3rd Street Promenade",
+                "cityLine": "Santa Monica, CA 90401",
+                "phone": "(310) 555-0142"
+              },
+              {
+                "id": "south-congress",
+                "name": "South Congress",
+                "addressLine": "1204 South Congress Avenue",
+                "cityLine": "Austin, TX 78704",
+                "phone": "(512) 555-0187"
+              },
+              {
+                "id": "williamsburg",
+                "name": "Williamsburg",
+                "addressLine": "88 Berry Street",
+                "cityLine": "Brooklyn, NY 11249",
+                "phone": "(718) 555-0193"
+              }
+            ],
+            "hours": [
+              { "id": "weekdays", "days": "Monday - Thursday", "time": "10:30 AM - 9:00 PM" },
+              { "id": "weekend", "days": "Friday - Saturday", "time": "10:30 AM - 10:00 PM" },
+              { "id": "sunday", "days": "Sunday", "time": "11:00 AM - 8:00 PM" }
+            ],
+            "hoursNote": "Holiday hours may vary by store.",
+            "explore": [
+              { "id": "menu", "label": "Full Menu", "target": { "kind": "page", "pageId": "menu" } },
+              { "id": "order", "label": "Order Online", "target": { "kind": "page", "pageId": "home", "fragment": "order" } },
+              { "id": "about", "label": "Our Story", "target": { "kind": "page", "pageId": "home", "fragment": "about" } },
+              { "id": "locations", "label": "Locations", "target": { "kind": "page", "pageId": "home", "fragment": "locations" } }
+            ],
+            "contact": {
+              "email": "hello@rootandgrain.com",
+              "phone": "(310) 555-0142",
+              "social": [
+                { "id": "instagram", "label": "Instagram", "target": { "kind": "external", "href": "https://www.instagram.com/" } },
+                { "id": "facebook", "label": "Facebook", "target": { "kind": "external", "href": "https://www.facebook.com/" } },
+                { "id": "twitter", "label": "X (formerly Twitter)", "target": { "kind": "external", "href": "https://x.com/" } }
+              ]
+            },
+            "legalNote": "2025 Root & Grain Fresh Kitchen. Nutrition and allergen information is available in store."
+          }
+        }
+      ]
+    },
+    {
+      "id": "menu",
+      "path": "/menu",
+      "metadata": {
+        "title": "Menu | Salads, Grain Bowls, Sides & Drinks - Root & Grain",
+        "description": "Browse the full Root & Grain menu: signature salads, warm grain bowls, sides, cold-pressed drinks, desserts and limited-time seasonal dishes, with prices and nutrition.",
+        "canonicalPath": "/menu",
+        "robots": { "index": true, "follow": true }
+      },
+      "sections": [
+        {
+          "id": "header",
+          "type": "site",
+          "variant": "header",
+          "content": {
+            "brandName": "Root & Grain",
+            "brandTagline": "Fresh Kitchen",
+            "brandTarget": { "kind": "page", "pageId": "home", "fragment": "top" },
+            "navigationLabel": "Main navigation",
+            "navigation": [
+              { "id": "home", "label": "Home", "target": { "kind": "page", "pageId": "home", "fragment": "top" } },
+              { "id": "menu", "label": "Menu", "target": { "kind": "page", "pageId": "menu" } },
+              { "id": "order", "label": "Order Online", "target": { "kind": "page", "pageId": "home", "fragment": "order" } },
+              { "id": "locations", "label": "Locations", "target": { "kind": "page", "pageId": "home", "fragment": "locations" } },
+              { "id": "about", "label": "About Us", "target": { "kind": "page", "pageId": "home", "fragment": "about" } },
+              { "id": "contact", "label": "Contact Us", "target": { "kind": "page", "pageId": "home", "fragment": "contact" } }
+            ],
+            "action": { "label": "Start Your Order", "target": { "kind": "page", "pageId": "menu" } }
+          }
+        },
+        {
+          "id": "intro",
+          "type": "menu",
+          "variant": "intro",
+          "content": {
+            "eyebrow": "The menu",
+            "title": "Bowls, salads and sides made to order",
+            "description": "Six categories, everything cooked from scratch the morning it is served. Filter by what you are in the mood for, or sort by price and build your own bowl.",
+            "media": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=2000&q=80",
+              "alt": "Bright green salad bowl with avocado, cucumber and leafy greens on a light table",
+              "width": 2000,
+              "height": 1500
+            },
+            "highlights": [
+              { "id": "dishes", "value": "21", "label": "Made-to-order dishes" },
+              { "id": "categories", "value": "6", "label": "Menu categories" },
+              { "id": "scratch", "value": "100%", "label": "Cooked from scratch" }
+            ],
+            "note": "Prices are in USD. Ask any team member about allergen swaps, gluten-free options and nutrition details."
+          }
+        },
+        {
+          "id": "catalog",
+          "type": "menu",
+          "variant": "catalog",
+          "content": {
+            "eyebrow": "Filter and sort",
+            "title": "Build your own bowl or pick a house favourite",
+            "description": "Every dish is assembled when you order it. Choose a category, sort the list, and add what you like.",
+            "allLabel": "All Dishes",
+            "categories": [
+              { "id": "salads", "label": "Salads" },
+              { "id": "grain-bowls", "label": "Grain Bowls" },
+              { "id": "sides", "label": "Sides" },
+              { "id": "drinks", "label": "Drinks" },
+              { "id": "desserts", "label": "Desserts" },
+              { "id": "limited-time", "label": "Limited Time" }
+            ],
+            "sorts": [
+              { "id": "featured", "label": "Featured" },
+              { "id": "price-asc", "label": "Price: Low to High" },
+              { "id": "price-desc", "label": "Price: High to Low" },
+              { "id": "name-asc", "label": "Name: A to Z" }
+            ],
+            "dishes": [
+              {
+                "id": "guacamole-greens",
+                "name": "Guacamole Greens",
+                "description": "Chopped romaine and arugula, avocado, roasted chicken, grape tomatoes, red onion, lime cilantro jalapeno vinaigrette.",
+                "price": 14.95,
+                "categoryId": "salads",
+                "calories": 520,
+                "badge": "Most Loved",
+                "tags": ["Gluten-Free", "Dairy-Free", "High Protein"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Guacamole Greens salad with avocado, chicken and cherry tomatoes",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "kale-caesar",
+                "name": "Kale Caesar",
+                "description": "Massaged kale, shaved parmesan, toasted almonds, sourdough croutons and lemon caesar dressing.",
+                "price": 13.95,
+                "categoryId": "salads",
+                "calories": 480,
+                "tags": ["Vegetarian"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Kale caesar salad tossed with parmesan and croutons",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "harvest-cobb",
+                "name": "Harvest Cobb",
+                "description": "Mixed greens, soft-cooked egg, blue cheese, roasted turkey, apple, candied pecans and cider vinaigrette.",
+                "price": 16.25,
+                "categoryId": "salads",
+                "calories": 610,
+                "tags": ["High Protein", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Harvest cobb salad with egg, blue cheese, turkey and apple",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "earth-bowl-salad",
+                "name": "Earth Bowl Salad",
+                "description": "Shredded kale, warm portobello, roasted sweet potato, black lentils, goat cheese and balsamic.",
+                "price": 15.25,
+                "categoryId": "salads",
+                "calories": 540,
+                "tags": ["Vegetarian"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Earth bowl salad with roasted sweet potato, lentils and goat cheese",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "spicy-shrimp-caesar",
+                "name": "Spicy Shrimp Caesar",
+                "description": "Chopped romaine, grilled shrimp, cotija, crispy corn, jalapeno and chipotle caesar dressing.",
+                "price": 16.75,
+                "categoryId": "salads",
+                "calories": 590,
+                "tags": ["Spicy", "High Protein"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Spicy shrimp caesar salad with crispy corn and cotija",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "miso-sweet-potato",
+                "name": "Miso Sweet Potato Bowl",
+                "description": "Forbidden rice, roasted sweet potato, broccoli, red cabbage, miso ginger dressing and sesame.",
+                "price": 14.5,
+                "categoryId": "grain-bowls",
+                "calories": 580,
+                "badge": "Chef's Pick",
+                "tags": ["Vegan", "Dairy-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Miso roasted sweet potato bowl with broccoli and red cabbage",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "warm-farro-mushroom",
+                "name": "Warm Farro & Mushroom",
+                "description": "Warm farro, roasted mushrooms, caramelised onion, herb tahini and crispy shallots.",
+                "price": 15.5,
+                "categoryId": "grain-bowls",
+                "calories": 640,
+                "tags": ["Vegan", "Dairy-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Warm farro bowl with roasted mushrooms and herb tahini",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "chicken-pesto-quinoa",
+                "name": "Chicken Pesto Quinoa",
+                "description": "Quinoa, grilled chicken, basil pesto, cherry tomato, baby spinach and parmesan.",
+                "price": 16.5,
+                "categoryId": "grain-bowls",
+                "calories": 660,
+                "tags": ["High Protein"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Chicken pesto quinoa bowl with cherry tomatoes and spinach",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "harvest-grain-bowl",
+                "name": "Harvest Grain Bowl",
+                "description": "Brown rice, roasted squash, kale, dried cranberry, pepitas and maple dijon vinaigrette.",
+                "price": 14.75,
+                "categoryId": "grain-bowls",
+                "calories": 590,
+                "tags": ["Vegan", "Gluten-Free", "Dairy-Free", "Seasonal"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Harvest grain bowl with roasted squash, kale and pumpkin seeds",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "steak-chimichurri",
+                "name": "Steak & Chimichurri",
+                "description": "Brown rice, sliced grass-fed steak, chimichurri, roasted peppers and arugula.",
+                "price": 17.5,
+                "categoryId": "grain-bowls",
+                "calories": 690,
+                "tags": ["High Protein", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Sliced steak with chimichurri served over brown rice and peppers",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "crispy-brussels-sprouts",
+                "name": "Crispy Brussels Sprouts",
+                "description": "Roasted brussels sprouts, lemon zest, chilli flake and parmesan.",
+                "price": 6.5,
+                "categoryId": "sides",
+                "calories": 260,
+                "tags": ["Vegetarian", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1519996529931-28324d5a630e?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Crispy roasted brussels sprouts with lemon zest and parmesan",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "sweet-potato-wedges",
+                "name": "Roasted Sweet Potato Wedges",
+                "description": "Sweet potato wedges, smoked paprika and herb aioli on the side.",
+                "price": 6.95,
+                "categoryId": "sides",
+                "calories": 310,
+                "tags": ["Vegetarian", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1466637574441-749b8f19452f?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Roasted sweet potato wedges with smoked paprika and herb aioli",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "tomato-basil-soup",
+                "name": "Tomato Basil Soup",
+                "description": "Slow-simmered tomato, sweet basil, olive oil and cracked pepper.",
+                "price": 5.75,
+                "categoryId": "sides",
+                "calories": 220,
+                "tags": ["Vegan", "Dairy-Free", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Bowl of tomato basil soup with fresh basil and olive oil",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "cold-pressed-green-juice",
+                "name": "Cold-Pressed Green Juice",
+                "description": "Kale, cucumber, green apple, lemon and ginger, pressed to order.",
+                "price": 6.75,
+                "categoryId": "drinks",
+                "calories": 120,
+                "tags": ["Vegan", "Dairy-Free", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1497534446932-c925b458314e?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Cold-pressed green juice with kale, cucumber and apple",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "basil-lemonade-spritz",
+                "name": "Basil Lemonade Spritz",
+                "description": "House lemonade, fresh basil, sparkling water and a touch of light agave.",
+                "price": 5.25,
+                "categoryId": "drinks",
+                "calories": 110,
+                "tags": ["Vegan", "Dairy-Free", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Sparkling basil lemonade served over ice in a tall glass",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "cold-brew-coffee",
+                "name": "Cold Brew Coffee",
+                "description": "Steeped for 18 hours and served over ice, with oat milk on request.",
+                "price": 4.5,
+                "categoryId": "drinks",
+                "calories": 25,
+                "tags": ["Vegan", "Dairy-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1502741224143-90386d7f8c82?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Iced cold brew coffee in a glass with a metal straw",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "olive-oil-citrus-cake",
+                "name": "Olive Oil Citrus Cake",
+                "description": "Olive oil cake, orange zest, whipped ricotta and honey.",
+                "price": 6.95,
+                "categoryId": "desserts",
+                "calories": 380,
+                "tags": ["Vegetarian"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Slice of olive oil citrus cake with whipped ricotta and honey",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "dark-chocolate-chia",
+                "name": "Dark Chocolate Chia Cup",
+                "description": "Chia pudding, dark chocolate, coconut cream and toasted almond.",
+                "price": 5.5,
+                "categoryId": "desserts",
+                "calories": 300,
+                "tags": ["Vegan", "Dairy-Free", "Gluten-Free"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1481391319762-47dff72954d9?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Dark chocolate chia pudding topped with coconut cream and almonds",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "berry-oat-crumble",
+                "name": "Berry Oat Crumble",
+                "description": "Warm berry compote, oat crumble and vanilla yoghurt.",
+                "price": 7.25,
+                "categoryId": "desserts",
+                "calories": 360,
+                "tags": ["Vegetarian"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Warm berry oat crumble with vanilla yoghurt",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "charred-corn-cotija",
+                "name": "Charred Corn & Cotija Bowl",
+                "description": "Charred sweet corn, cotija, avocado, warm farro, lime crema and plenty of cilantro.",
+                "price": 16.25,
+                "categoryId": "limited-time",
+                "calories": 640,
+                "badge": "New",
+                "tags": ["Vegetarian", "Seasonal"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Charred corn and cotija cheese grain bowl with avocado and herbs",
+                  "width": 1600,
+                  "height": 1200
+                }
+              },
+              {
+                "id": "stone-fruit-burrata",
+                "name": "Stone Fruit & Burrata Salad",
+                "description": "Ripe peaches, burrata, arugula, prosciutto, basil oil and a torn sourdough crouton.",
+                "price": 15.75,
+                "categoryId": "limited-time",
+                "calories": 520,
+                "badge": "Limited",
+                "tags": ["Seasonal"],
+                "media": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1600&q=80",
+                  "alt": "Stone fruit and burrata salad with arugula and basil oil",
+                  "width": 1600,
+                  "height": 1200
+                }
+              }
+            ],
+            "resultsLabel": "dishes",
+            "emptyState": "No dishes in this category yet. Try another tab or show all dishes.",
+            "priceNote": "Base prices shown. Add a protein, extra dressing or a side at checkout."
+          }
+        },
+        {
+          "id": "contact",
+          "type": "site",
+          "variant": "footer",
+          "content": {
+            "brandName": "Root & Grain",
+            "headline": "Real food, made fast, sourced close to home.",
+            "description": "Root & Grain is a fast-casual kitchen serving salads, grain bowls and cold-pressed drinks from 38 family farms across three states.",
+            "columnTitles": {
+              "stores": "Visit Us",
+              "hours": "Kitchen Hours",
+              "explore": "Explore",
+              "contact": "Get in Touch"
+            },
+            "stores": [
+              {
+                "id": "santa-monica",
+                "name": "Santa Monica",
+                "addressLine": "1447 3rd Street Promenade",
+                "cityLine": "Santa Monica, CA 90401",
+                "phone": "(310) 555-0142"
+              },
+              {
+                "id": "south-congress",
+                "name": "South Congress",
+                "addressLine": "1204 South Congress Avenue",
+                "cityLine": "Austin, TX 78704",
+                "phone": "(512) 555-0187"
+              },
+              {
+                "id": "williamsburg",
+                "name": "Williamsburg",
+                "addressLine": "88 Berry Street",
+                "cityLine": "Brooklyn, NY 11249",
+                "phone": "(718) 555-0193"
+              }
+            ],
+            "hours": [
+              { "id": "weekdays", "days": "Monday - Thursday", "time": "10:30 AM - 9:00 PM" },
+              { "id": "weekend", "days": "Friday - Saturday", "time": "10:30 AM - 10:00 PM" },
+              { "id": "sunday", "days": "Sunday", "time": "11:00 AM - 8:00 PM" }
+            ],
+            "hoursNote": "Holiday hours may vary by store.",
+            "explore": [
+              { "id": "menu", "label": "Full Menu", "target": { "kind": "page", "pageId": "menu" } },
+              { "id": "order", "label": "Order Online", "target": { "kind": "page", "pageId": "home", "fragment": "order" } },
+              { "id": "about", "label": "Our Story", "target": { "kind": "page", "pageId": "home", "fragment": "about" } },
+              { "id": "locations", "label": "Locations", "target": { "kind": "page", "pageId": "home", "fragment": "locations" } }
+            ],
+            "contact": {
+              "email": "hello@rootandgrain.com",
+              "phone": "(310) 555-0142",
+              "social": [
+                { "id": "instagram", "label": "Instagram", "target": { "kind": "external", "href": "https://www.instagram.com/" } },
+                { "id": "facebook", "label": "Facebook", "target": { "kind": "external", "href": "https://www.facebook.com/" } },
+                { "id": "twitter", "label": "X (formerly Twitter)", "target": { "kind": "external", "href": "https://x.com/" } }
+              ]
+            },
+            "legalNote": "2025 Root & Grain Fresh Kitchen. Nutrition and allergen information is available in store."
+          }
+        }
+      ]
+    }
+  ]
+}

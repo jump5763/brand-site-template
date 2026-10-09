@@ -1,0 +1,1751 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/site-schema/generated",
+  "title": "SiteDocument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "siteId",
+    "siteUrl",
+    "theme",
+    "pages"
+  ],
+  "properties": {
+    "siteId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "siteUrl": {
+      "type": "string",
+      "pattern": "^https?://[^\\s]+$",
+      "format": "uri"
+    },
+    "theme": {
+      "$ref": "#/$defs/theme"
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/page"
+      }
+    }
+  },
+  "$defs": {
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fonts",
+        "colors"
+      ],
+      "properties": {
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heading",
+            "typography"
+          ],
+          "properties": {
+            "heading": {
+              "enum": [
+                "System Sans",
+                "System Serif"
+              ]
+            },
+            "typography": {
+              "enum": [
+                "System Sans",
+                "System Serif"
+              ]
+            }
+          }
+        },
+        "colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "background",
+            "foreground",
+            "card",
+            "cardForeground",
+            "popover",
+            "popoverForeground",
+            "primary",
+            "primaryForeground",
+            "secondary",
+            "secondaryForeground",
+            "muted",
+            "mutedForeground",
+            "accent",
+            "accentForeground",
+            "destructive",
+            "destructiveForeground",
+            "border",
+            "input",
+            "ring"
+          ],
+          "properties": {
+            "background": {
+              "$ref": "#/$defs/color"
+            },
+            "foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "card": {
+              "$ref": "#/$defs/color"
+            },
+            "cardForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "popover": {
+              "$ref": "#/$defs/color"
+            },
+            "popoverForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "primary": {
+              "$ref": "#/$defs/color"
+            },
+            "primaryForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "secondary": {
+              "$ref": "#/$defs/color"
+            },
+            "secondaryForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "muted": {
+              "$ref": "#/$defs/color"
+            },
+            "mutedForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "accent": {
+              "$ref": "#/$defs/color"
+            },
+            "accentForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "destructive": {
+              "$ref": "#/$defs/color"
+            },
+            "destructiveForeground": {
+              "$ref": "#/$defs/color"
+            },
+            "border": {
+              "$ref": "#/$defs/color"
+            },
+            "input": {
+              "$ref": "#/$defs/color"
+            },
+            "ring": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        }
+      }
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^(#[0-9A-Fa-f]{6}|hsl\\([0-9.]+ [0-9.]+% [0-9.]+%\\))$"
+    },
+    "page": {
+      "title": "SitePage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "metadata",
+        "sections"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/section"
+          }
+        }
+      }
+    },
+    "section": {
+      "title": "SiteSection",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HomeHeroSection"
+        },
+        {
+          "$ref": "#/$defs/IngredientsFreshSection"
+        },
+        {
+          "$ref": "#/$defs/LocationsBranchesSection"
+        },
+        {
+          "$ref": "#/$defs/MarqueeTickerSection"
+        },
+        {
+          "$ref": "#/$defs/MenuCatalogSection"
+        },
+        {
+          "$ref": "#/$defs/MenuIntroSection"
+        },
+        {
+          "$ref": "#/$defs/MenuSeasonalSection"
+        },
+        {
+          "$ref": "#/$defs/OrderCtaSection"
+        },
+        {
+          "$ref": "#/$defs/SiteFooterSection"
+        },
+        {
+          "$ref": "#/$defs/SiteHeaderSection"
+        },
+        {
+          "$ref": "#/$defs/StoryAboutSection"
+        },
+        {
+          "$ref": "#/$defs/TestimonialsGuestsSection"
+        }
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalPath",
+        "title",
+        "description"
+      ],
+      "properties": {
+        "canonicalPath": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "robots": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "index",
+            "follow"
+          ],
+          "properties": {
+            "index": {
+              "type": "boolean"
+            },
+            "follow": {
+              "type": "boolean"
+            }
+          }
+        },
+        "openGraph": {
+          "type": "object"
+        },
+        "structuredData": {
+          "type": [
+            "object",
+            "array"
+          ]
+        }
+      }
+    },
+    "media": {
+      "title": "SiteMedia",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "alt"
+      ],
+      "properties": {
+        "kind": {
+          "const": "image"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^(\\/media\\/|https:\\/\\/)"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "linkTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "pageId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "page"
+            },
+            "pageId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fragment": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "href"
+          ],
+          "properties": {
+            "kind": {
+              "const": "external"
+            },
+            "href": {
+              "type": "string",
+              "pattern": "^https?://"
+            }
+          }
+        }
+      ]
+    },
+    "siteAction": {
+      "title": "SiteAction",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "target"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "$ref": "#/$defs/linkTarget"
+        }
+      }
+    },
+    "HomeHeroSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "home"
+        },
+        "variant": {
+          "const": "hero"
+        },
+        "content": {
+          "title": "Home Hero",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "media",
+            "primaryAction",
+            "secondaryAction",
+            "highlights",
+            "scrollHint"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as the page's single h1."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "media": {
+              "$ref": "#/$defs/media"
+            },
+            "primaryAction": {
+              "$ref": "#/$defs/siteAction"
+            },
+            "secondaryAction": {
+              "$ref": "#/$defs/siteAction"
+            },
+            "highlights": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/HomeHeroSection/properties/content/$defs/heroHighlight"
+              }
+            },
+            "scrollHint": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "$defs": {
+            "heroHighlight": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "value",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "HomeHeroSection"
+    },
+    "IngredientsFreshSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "ingredients"
+        },
+        "variant": {
+          "const": "fresh"
+        },
+        "content": {
+          "title": "Fresh Ingredients",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "items",
+            "note"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "items": {
+              "type": "array",
+              "minItems": 3,
+              "items": {
+                "$ref": "#/$defs/IngredientsFreshSection/properties/content/$defs/ingredientItem"
+              }
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "$defs": {
+            "ingredientItem": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "description",
+                "icon",
+                "media"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "icon": {
+                  "type": "string",
+                  "enum": [
+                    "leaf",
+                    "sprout",
+                    "wheat",
+                    "sun",
+                    "droplet",
+                    "heart",
+                    "truck",
+                    "recycle"
+                  ]
+                },
+                "media": {
+                  "$ref": "#/$defs/media"
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "IngredientsFreshSection"
+    },
+    "LocationsBranchesSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "locations"
+        },
+        "variant": {
+          "const": "branches"
+        },
+        "content": {
+          "title": "Store Locations",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "map",
+            "branches",
+            "note"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "map": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "query",
+                "zoom",
+                "title"
+              ],
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Place query passed to the Google Maps embed."
+                },
+                "zoom": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 21
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Accessible title for the map frame."
+                }
+              }
+            },
+            "branches": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/LocationsBranchesSection/properties/content/$defs/branch"
+              }
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "$defs": {
+            "branch": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "addressLine",
+                "cityLine",
+                "phone",
+                "hours",
+                "services"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "addressLine": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cityLine": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "phone": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "hours": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "services": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "LocationsBranchesSection"
+    },
+    "MarqueeTickerSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "marquee"
+        },
+        "variant": {
+          "const": "ticker"
+        },
+        "content": {
+          "title": "Marquee Ticker",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "label",
+            "items"
+          ],
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Accessible name for the ticker region."
+            },
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "title": "MarqueeTickerSection"
+    },
+    "MenuCatalogSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "menu"
+        },
+        "variant": {
+          "const": "catalog"
+        },
+        "content": {
+          "title": "Menu Catalog",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "allLabel",
+            "categories",
+            "sorts",
+            "dishes",
+            "resultsLabel",
+            "emptyState",
+            "priceNote"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "allLabel": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Label of the unfiltered category option, always rendered first."
+            },
+            "categories": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/MenuCatalogSection/properties/content/$defs/menuCategory"
+              }
+            },
+            "sorts": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/MenuCatalogSection/properties/content/$defs/menuSort"
+              }
+            },
+            "dishes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/MenuCatalogSection/properties/content/$defs/menuDish"
+              }
+            },
+            "resultsLabel": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Unit noun for the visible result count, e.g. \"dishes\"."
+            },
+            "emptyState": {
+              "type": "string",
+              "minLength": 1
+            },
+            "priceNote": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "$defs": {
+            "menuCategory": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "menuSort": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "featured",
+                    "price-asc",
+                    "price-desc",
+                    "name-asc"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "menuDish": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "description",
+                "price",
+                "categoryId",
+                "tags",
+                "media"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "price": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "categoryId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Must match one of the category ids."
+                },
+                "calories": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "badge": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "Vegan",
+                      "Vegetarian",
+                      "Gluten-Free",
+                      "Dairy-Free",
+                      "High Protein",
+                      "Spicy",
+                      "Paleo",
+                      "Seasonal",
+                      "Low Calorie"
+                    ]
+                  }
+                },
+                "media": {
+                  "$ref": "#/$defs/media"
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "MenuCatalogSection"
+    },
+    "MenuIntroSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "menu"
+        },
+        "variant": {
+          "const": "intro"
+        },
+        "content": {
+          "title": "Menu Intro",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "media",
+            "highlights",
+            "note"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as the page's single h1."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "media": {
+              "$ref": "#/$defs/media"
+            },
+            "highlights": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/MenuIntroSection/properties/content/$defs/introHighlight"
+              }
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "$defs": {
+            "introHighlight": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "value",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "MenuIntroSection"
+    },
+    "MenuSeasonalSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "menu"
+        },
+        "variant": {
+          "const": "seasonal"
+        },
+        "content": {
+          "title": "Seasonal Favorites",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "action",
+            "dishes"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "action": {
+              "$ref": "#/$defs/siteAction"
+            },
+            "dishes": {
+              "type": "array",
+              "minItems": 3,
+              "items": {
+                "$ref": "#/$defs/MenuSeasonalSection/properties/content/$defs/featuredDish"
+              }
+            }
+          },
+          "$defs": {
+            "featuredDish": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "description",
+                "price",
+                "media"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "price": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "calories": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "badge": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "media": {
+                  "$ref": "#/$defs/media"
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "MenuSeasonalSection"
+    },
+    "OrderCtaSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "order"
+        },
+        "variant": {
+          "const": "cta"
+        },
+        "content": {
+          "title": "Order Call To Action",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "primaryAction",
+            "secondaryAction",
+            "perks",
+            "note"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "primaryAction": {
+              "$ref": "#/$defs/siteAction"
+            },
+            "secondaryAction": {
+              "$ref": "#/$defs/siteAction"
+            },
+            "perks": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "title": "OrderCtaSection"
+    },
+    "SiteFooterSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "site"
+        },
+        "variant": {
+          "const": "footer"
+        },
+        "content": {
+          "title": "Site Footer",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "brandName",
+            "headline",
+            "description",
+            "columnTitles",
+            "stores",
+            "hours",
+            "hoursNote",
+            "explore",
+            "contact",
+            "legalNote"
+          ],
+          "properties": {
+            "brandName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "headline": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Brand statement rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "columnTitles": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stores",
+                "hours",
+                "explore",
+                "contact"
+              ],
+              "properties": {
+                "stores": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "hours": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "explore": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "contact": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "stores": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/SiteFooterSection/properties/content/$defs/footerStore"
+              }
+            },
+            "hours": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/SiteFooterSection/properties/content/$defs/hoursRow"
+              }
+            },
+            "hoursNote": {
+              "type": "string",
+              "minLength": 1
+            },
+            "explore": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/SiteFooterSection/properties/content/$defs/footerLink"
+              }
+            },
+            "contact": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "email",
+                "phone",
+                "social"
+              ],
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "minLength": 3
+                },
+                "phone": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "social": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/SiteFooterSection/properties/content/$defs/socialLink"
+                  }
+                }
+              }
+            },
+            "legalNote": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "$defs": {
+            "footerStore": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "addressLine",
+                "cityLine",
+                "phone"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "addressLine": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cityLine": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "phone": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "hoursRow": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "days",
+                "time"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "days": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "time": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "footerLink": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label",
+                "target"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target": {
+                  "$ref": "#/$defs/linkTarget"
+                }
+              }
+            },
+            "socialLink": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label",
+                "target"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target": {
+                  "$ref": "#/$defs/linkTarget"
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "SiteFooterSection"
+    },
+    "SiteHeaderSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "site"
+        },
+        "variant": {
+          "const": "header"
+        },
+        "content": {
+          "title": "Site Header",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "brandName",
+            "brandTarget",
+            "navigationLabel",
+            "navigation",
+            "action"
+          ],
+          "properties": {
+            "brandName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "brandTagline": {
+              "type": "string"
+            },
+            "brandTarget": {
+              "$ref": "#/$defs/linkTarget"
+            },
+            "navigationLabel": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Accessible name for the navigation landmark, e.g. \"Main navigation\"."
+            },
+            "navigation": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/SiteHeaderSection/properties/content/$defs/headerLink"
+              }
+            },
+            "action": {
+              "$ref": "#/$defs/siteAction"
+            }
+          },
+          "$defs": {
+            "headerLink": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label",
+                "target"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target": {
+                  "$ref": "#/$defs/linkTarget"
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "SiteHeaderSection"
+    },
+    "StoryAboutSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "story"
+        },
+        "variant": {
+          "const": "about"
+        },
+        "content": {
+          "title": "Brand Story",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "body",
+            "media",
+            "secondaryMedia",
+            "stats",
+            "action"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "body": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "media": {
+              "$ref": "#/$defs/media"
+            },
+            "secondaryMedia": {
+              "$ref": "#/$defs/media"
+            },
+            "stats": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/StoryAboutSection/properties/content/$defs/storyStat"
+              }
+            },
+            "action": {
+              "$ref": "#/$defs/siteAction"
+            }
+          },
+          "$defs": {
+            "storyStat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "value",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "StoryAboutSection"
+    },
+    "TestimonialsGuestsSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "const": "testimonials"
+        },
+        "variant": {
+          "const": "guests"
+        },
+        "content": {
+          "title": "Guest Reviews",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eyebrow",
+            "title",
+            "description",
+            "reviews"
+          ],
+          "properties": {
+            "eyebrow": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Rendered as this section's h2."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviews": {
+              "type": "array",
+              "minItems": 3,
+              "items": {
+                "$ref": "#/$defs/TestimonialsGuestsSection/properties/content/$defs/guestReview"
+              }
+            }
+          },
+          "$defs": {
+            "guestReview": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "quote",
+                "name",
+                "detail",
+                "rating"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "detail": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "favorite": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rating": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "media": {
+                  "$ref": "#/$defs/media"
+                }
+              }
+            }
+          }
+        }
+      },
+      "title": "TestimonialsGuestsSection"
+    }
+  }
+}

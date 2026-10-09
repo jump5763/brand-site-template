@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "home.hero",
+  "type": "home",
+  "variant": "hero",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Home Hero",
+    "description": "Full-bleed photo hero that provides the page h1 with eyebrow, description, two call-to-action buttons, trust highlights and a scroll hint. Renders one h1 and no other headings.",
+    "useWhen": ["A home page needs an immersive first screen with the page's h1"],
+    "avoidWhen": ["A page needs an information block below the fold (use a content section)"],
+    "rendering": "server"
+  }
+}
