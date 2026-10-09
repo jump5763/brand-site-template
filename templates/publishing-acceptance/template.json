@@ -1,7 +1,7 @@
 {
   "id": "publishing-acceptance",
-  "templateVersion": "1.0.0",
-  "name": "Publishing Acceptance 1.0.0",
+  "templateVersion": "1.0.1",
+  "name": "Publishing Acceptance 1.0.1",
   "description": "Isolated new-site3 copy for full subtree replacement acceptance.",
   "tags": [],
   "formatVersion": 1,
