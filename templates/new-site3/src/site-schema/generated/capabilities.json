@@ -1,0 +1,581 @@
+[
+  {
+    "id": "home.hero",
+    "type": "home",
+    "variant": "hero",
+    "title": "Home Hero",
+    "description": "Full-bleed photo hero that provides the page h1 with eyebrow, description, two call-to-action buttons, trust highlights and a scroll hint. Renders one h1 and no other headings.",
+    "useWhen": [
+      "A home page needs an immersive first screen with the page's h1"
+    ],
+    "avoidWhen": [
+      "A page needs an information block below the fold (use a content section)"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as the page's single h1."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "media",
+        "required": true
+      },
+      {
+        "name": "primaryAction",
+        "required": true
+      },
+      {
+        "name": "secondaryAction",
+        "required": true
+      },
+      {
+        "name": "highlights",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "scrollHint",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "ingredients.fresh",
+    "type": "ingredients",
+    "variant": "fresh",
+    "title": "Fresh Ingredients",
+    "description": "Grid of sourcing or ingredient proof points with photo, icon badge, title and description. Renders one h2 and one h3 per item title.",
+    "useWhen": [
+      "The brand should explain how ingredients are sourced"
+    ],
+    "avoidWhen": [
+      "The block is about people or history (use a story capability)"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "note",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "locations.branches",
+    "type": "locations",
+    "variant": "branches",
+    "title": "Store Locations",
+    "description": "Google Maps embed beside a list of store cards with address, phone, opening hours and services. Renders one h2 and one h3 per store name.",
+    "useWhen": [
+      "The page should show where the restaurants are and when they are open"
+    ],
+    "avoidWhen": [
+      "The addresses belong in the footer only"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "map",
+        "required": true,
+        "type": "object"
+      },
+      {
+        "name": "branches",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "note",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "marquee.ticker",
+    "type": "marquee",
+    "variant": "ticker",
+    "title": "Marquee Ticker",
+    "description": "Full-width continuously scrolling strip of short brand statements. Renders no headings; it is a decorative region with an accessible label.",
+    "useWhen": [
+      "Short brand proof points should run continuously between major sections"
+    ],
+    "avoidWhen": [
+      "The content needs to be read as a list or heading (use a content section)"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "label",
+        "required": true,
+        "type": "string",
+        "description": "Accessible name for the ticker region."
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "menu.catalog",
+    "type": "menu",
+    "variant": "catalog",
+    "title": "Menu Catalog",
+    "description": "Filterable and sortable menu grid with a category tab row, a sort selector, a live result count and standardized dish cards. Renders one h2 and one h3 per visible dish name.",
+    "useWhen": [
+      "A menu page should let guests filter dishes by category and sort them"
+    ],
+    "avoidWhen": [
+      "Only a small curated set of dishes should be shown (use a seasonal carousel)"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "allLabel",
+        "required": true,
+        "type": "string",
+        "description": "Label of the unfiltered category option, always rendered first."
+      },
+      {
+        "name": "categories",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "sorts",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "dishes",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "resultsLabel",
+        "required": true,
+        "type": "string",
+        "description": "Unit noun for the visible result count, e.g. \"dishes\"."
+      },
+      {
+        "name": "emptyState",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "priceNote",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "menu.intro",
+    "type": "menu",
+    "variant": "intro",
+    "title": "Menu Intro",
+    "description": "Menu page opening block that provides the page h1 with eyebrow, description, sourcing note, proof-point highlights and a dish photo. Renders one h1.",
+    "useWhen": [
+      "A menu page needs its opening heading and summary"
+    ],
+    "avoidWhen": [
+      "The page needs the filterable dish list (use a catalog capability)"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as the page's single h1."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "media",
+        "required": true
+      },
+      {
+        "name": "highlights",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "note",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "menu.seasonal",
+    "type": "menu",
+    "variant": "seasonal",
+    "title": "Seasonal Favorites",
+    "description": "Swipeable carousel of seasonal or new dishes with image, name, description, price, tags and badge. Renders one h2 and one h3 per dish name.",
+    "useWhen": [
+      "A page should spotlight a handful of new or seasonal dishes"
+    ],
+    "avoidWhen": [
+      "The full filterable menu is required (use a catalog capability)"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "required": true
+      },
+      {
+        "name": "dishes",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "order.cta",
+    "type": "order",
+    "variant": "cta",
+    "title": "Order Call To Action",
+    "description": "High-contrast brand-colour panel with ordering message, primary and secondary actions, perk list and a footnote. Renders one h2.",
+    "useWhen": [
+      "The page needs a prominent ordering call to action"
+    ],
+    "avoidWhen": [
+      "The page already ends in a different closing action"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "primaryAction",
+        "required": true
+      },
+      {
+        "name": "secondaryAction",
+        "required": true
+      },
+      {
+        "name": "perks",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "note",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "site.footer",
+    "type": "site",
+    "variant": "footer",
+    "title": "Site Footer",
+    "description": "Site footer with a brand statement h2, store addresses, opening hours, explore links and contact details.",
+    "useWhen": [
+      "A page needs the closing footer with store, hours, contact and navigation information"
+    ],
+    "avoidWhen": [
+      "The content is a mid-page information band (use a locations or story section)"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "brandName",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "headline",
+        "required": true,
+        "type": "string",
+        "description": "Brand statement rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "columnTitles",
+        "required": true,
+        "type": "object"
+      },
+      {
+        "name": "stores",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "hours",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "hoursNote",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "explore",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "contact",
+        "required": true,
+        "type": "object"
+      },
+      {
+        "name": "legalNote",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": "site.header",
+    "type": "site",
+    "variant": "header",
+    "title": "Site Header",
+    "description": "Fixed top navigation bar with brand wordmark, page navigation, a primary order call-to-action and a mobile sheet menu. Renders no headings; it is a navigation landmark only.",
+    "useWhen": [
+      "A page needs the shared site navigation bar at the top of the viewport"
+    ],
+    "avoidWhen": [
+      "The page needs an in-page hero or heading (use a hero capability)"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "brandName",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "brandTagline",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "name": "brandTarget",
+        "required": true
+      },
+      {
+        "name": "navigationLabel",
+        "required": true,
+        "type": "string",
+        "description": "Accessible name for the navigation landmark, e.g. \"Main navigation\"."
+      },
+      {
+        "name": "navigation",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "action",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "story.about",
+    "type": "story",
+    "variant": "about",
+    "title": "Brand Story",
+    "description": "Two-image editorial block telling the brand story with supporting paragraphs, numeric proof points and one call-to-action. Renders one h2.",
+    "useWhen": [
+      "The brand should explain who it is and how it works"
+    ],
+    "avoidWhen": [
+      "The block mainly lists sourcing facts (use a fresh ingredients capability)"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "body",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "media",
+        "required": true
+      },
+      {
+        "name": "secondaryMedia",
+        "required": true
+      },
+      {
+        "name": "stats",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "action",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "testimonials.guests",
+    "type": "testimonials",
+    "variant": "guests",
+    "title": "Guest Reviews",
+    "description": "Marquee of guest review cards that scrolls continuously and loops seamlessly, with star rating, quote, avatar, name, location detail and favourite dish. Pauses on hover, on keyboard focus, or via a pause control, and stops entirely for reduced-motion users. Renders one h2; guest names and ratings are not headings.",
+    "useWhen": [
+      "The page needs social proof from real guests"
+    ],
+    "avoidWhen": [
+      "The content is editorial brand storytelling (use a story capability)"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string",
+        "description": "Rendered as this section's h2."
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "reviews",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  }
+]

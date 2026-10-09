@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "story.about",
+  "type": "story",
+  "variant": "about",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Brand Story",
+    "description": "Two-image editorial block telling the brand story with supporting paragraphs, numeric proof points and one call-to-action. Renders one h2.",
+    "useWhen": ["The brand should explain who it is and how it works"],
+    "avoidWhen": ["The block mainly lists sourcing facts (use a fresh ingredients capability)"],
+    "rendering": "server"
+  }
+}

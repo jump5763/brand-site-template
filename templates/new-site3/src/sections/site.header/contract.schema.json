@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/site.header",
+  "title": "Site Header",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["brandName", "brandTarget", "navigationLabel", "navigation", "action"],
+  "properties": {
+    "brandName": { "type": "string", "minLength": 1 },
+    "brandTagline": { "type": "string" },
+    "brandTarget": { "$ref": "https://codeforma.local/site-schema/core#/$defs/linkTarget" },
+    "navigationLabel": { "type": "string", "minLength": 1, "description": "Accessible name for the navigation landmark, e.g. \"Main navigation\"." },
+    "navigation": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/headerLink" } },
+    "action": { "$ref": "https://codeforma.local/site-schema/core#/$defs/siteAction" }
+  },
+  "$defs": {
+    "headerLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "target"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "target": { "$ref": "https://codeforma.local/site-schema/core#/$defs/linkTarget" }
+      }
+    }
+  }
+}

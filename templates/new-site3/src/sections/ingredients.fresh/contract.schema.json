@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/ingredients.fresh",
+  "title": "Fresh Ingredients",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eyebrow", "title", "description", "items", "note"],
+  "properties": {
+    "eyebrow": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1, "description": "Rendered as this section's h2." },
+    "description": { "type": "string", "minLength": 1 },
+    "items": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/ingredientItem" } },
+    "note": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "ingredientItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description", "icon", "media"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "icon": { "type": "string", "enum": ["leaf", "sprout", "wheat", "sun", "droplet", "heart", "truck", "recycle"] },
+        "media": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" }
+      }
+    }
+  }
+}

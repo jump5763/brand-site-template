@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "menu.catalog",
+  "type": "menu",
+  "variant": "catalog",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Menu Catalog",
+    "description": "Filterable and sortable menu grid with a category tab row, a sort selector, a live result count and standardized dish cards. Renders one h2 and one h3 per visible dish name.",
+    "useWhen": ["A menu page should let guests filter dishes by category and sort them"],
+    "avoidWhen": ["Only a small curated set of dishes should be shown (use a seasonal carousel)"],
+    "rendering": "client-island"
+  }
+}

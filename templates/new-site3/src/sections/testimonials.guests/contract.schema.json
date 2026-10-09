@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/testimonials.guests",
+  "title": "Guest Reviews",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eyebrow", "title", "description", "reviews"],
+  "properties": {
+    "eyebrow": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1, "description": "Rendered as this section's h2." },
+    "description": { "type": "string", "minLength": 1 },
+    "reviews": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/guestReview" } }
+  },
+  "$defs": {
+    "guestReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "quote", "name", "detail", "rating"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "quote": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "detail": { "type": "string", "minLength": 1 },
+        "favorite": { "type": "string", "minLength": 1 },
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "media": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" }
+      }
+    }
+  }
+}

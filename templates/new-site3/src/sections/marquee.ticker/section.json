@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "marquee.ticker",
+  "type": "marquee",
+  "variant": "ticker",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Marquee Ticker",
+    "description": "Full-width continuously scrolling strip of short brand statements. Renders no headings; it is a decorative region with an accessible label.",
+    "useWhen": ["Short brand proof points should run continuously between major sections"],
+    "avoidWhen": ["The content needs to be read as a list or heading (use a content section)"],
+    "rendering": "server"
+  }
+}
