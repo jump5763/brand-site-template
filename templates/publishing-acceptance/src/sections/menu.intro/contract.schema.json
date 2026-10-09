@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/menu.intro",
+  "title": "Menu Intro",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eyebrow", "title", "description", "media", "highlights", "note"],
+  "properties": {
+    "eyebrow": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1, "description": "Rendered as the page's single h1." },
+    "description": { "type": "string", "minLength": 1 },
+    "media": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" },
+    "highlights": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/introHighlight" } },
+    "note": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "introHighlight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "value", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
