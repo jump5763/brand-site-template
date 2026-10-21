@@ -1,20 +1,19 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 import catalog from "./src/site-catalog.json";
 
-const scope = process.env.BRAND_SITE_BUILD_SCOPE || "all";
-if (scope !== "all" && !catalog.some((site) => site.id === scope)) throw new Error(`Unknown build scope: ${scope}`);
-
-const config: NextConfig = {
+const config = (phase: string): NextConfig => ({
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
-  outputFileTracingIncludes: { "/*": ["./sites/**/*.json"] },
-  distDir: scope === "all" ? ".next" : `.next-${scope.replace(/^site-/, "")}`,
+  // Select inputs before compilation; exclude only non-runtime build data.
+  outputFileTracingExcludes: { "/*": ["./.next/cache/**/*", "./output/**/*", "./dist/**/*"] },
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
   env: {
-    BRAND_SITE_BUILD_SCOPE: scope,
+    BRAND_SITE_BUILD_SCOPE: process.env.BRAND_SITE_BUILD_SCOPE || "all",
     SEARCH_INDEXING_ENABLED: process.env.SEARCH_INDEXING_ENABLED || "false",
   },
-  allowedDevOrigins: ["a.localhost", "b.localhost", "127.0.0.1"],
-};
+  allowedDevOrigins: [...catalog.map((site) => site.hostname), "127.0.0.1"],
+});
 
 export default config;

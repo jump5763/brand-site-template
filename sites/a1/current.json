@@ -1,6 +1,6 @@
 {
-  "siteId": "site-a",
-  "siteUrl": "http://a.localhost:3000",
+  "siteId": "a1",
+  "siteUrl": "http://a1.localhost:3000",
   "theme": {
     "fonts": {
       "heading": "System Sans",
@@ -34,7 +34,7 @@
       "type": "site-header",
       "variant": "default",
       "content": {
-        "brandName": "Fern & Grain",
+        "brandName": "Fern & Grain · Downtown",
         "nav": [
           {
             "label": "Home",
@@ -99,7 +99,7 @@
       "type": "site-footer",
       "variant": "default",
       "content": {
-        "brandName": "Fern & Grain",
+        "brandName": "Fern & Grain · Downtown",
         "brandDescription": "A fast-casual kitchen for chopped salads, warm grain bowls and cold-pressed drinks, built on produce harvested within 120 miles of Washington, DC.",
         "orderAction": {
           "label": "Order Now",
@@ -261,7 +261,7 @@
       "id": "home",
       "path": "/",
       "metadata": {
-        "title": "Fern & Grain | Fresh Salads & Grain Bowls",
+        "title": "Fern & Grain · Downtown | Fresh Bowls",
         "description": "Fern & Grain is a fast-casual kitchen serving chopped salads, warm grain bowls and cold-pressed drinks made fresh each morning with produce harvested within 120 miles of Washington, DC.",
         "canonicalPath": "/",
         "robots": {
@@ -305,7 +305,7 @@
           "variant": "default",
           "content": {
             "eyebrow": "Seasonal Kitchen · Est. 2014",
-            "title": "Real food, from farms we know.",
+            "title": "Fresh bowls in Downtown.",
             "description": "Chef-built salads, warm grain bowls and cold-pressed drinks made fresh every morning with produce harvested within 120 miles of our kitchens.",
             "primaryAction": {
               "label": "Order Now",
@@ -634,7 +634,7 @@
       "id": "menu",
       "path": "/menu",
       "metadata": {
-        "title": "Menu | Salads, Grain Bowls & Drinks | Fern & Grain",
+        "title": "Fern & Grain · Downtown | Menu",
         "description": "Browse the full Fern & Grain menu: chopped salads, warm grain bowls, sides, cold-pressed drinks, desserts and limited-time seasonal plates, with prices and calories for every dish.",
         "canonicalPath": "/menu",
         "robots": {
@@ -681,7 +681,7 @@
           "variant": "default",
           "content": {
             "eyebrow": "Our Menu",
-            "title": "Built fresh, every single morning",
+            "title": "The Downtown menu",
             "description": "Six categories and one rule: if it is not in season, it is not on the board. Every price you see includes the whole bowl.",
             "meta": [
               "Board updates weekly",

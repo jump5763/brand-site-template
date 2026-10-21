@@ -1,8 +1,7 @@
-import type { Config } from "tailwindcss";
-import defaultTheme from "tailwindcss/defaultTheme";
+const defaultTheme = require("tailwindcss/defaultTheme");
 
 // Keep hex tokens intact while supporting Tailwind opacity modifiers.
-const color = (token: string) =>
+const color = (token) =>
   `color-mix(in srgb, var(--${token}) calc(<alpha-value> * 100%), transparent)`;
 
 const bodyFontFamily = [
@@ -12,9 +11,8 @@ const bodyFontFamily = [
   "sans-serif",
 ];
 
-export default {
+module.exports = {
   darkMode: ["class"],
-  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     screens: {
       ...defaultTheme.screens,
@@ -102,4 +100,4 @@ export default {
     },
   },
   plugins: [require("tailwindcss-animate")],
-} satisfies Config;
+};

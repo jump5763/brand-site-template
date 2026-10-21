@@ -1,16 +1,30 @@
 [
   {
-    "id": "site-a",
-    "name": "模板 a",
+    "id": "a1",
+    "name": "商家 A1 · Downtown",
     "templateId": "a",
-    "hostname": "a.localhost",
-    "contentFile": "sites/site-a/current.json"
+    "hostname": "a1.localhost",
+    "contentFile": "sites/a1/current.json"
   },
   {
-    "id": "site-b",
-    "name": "模板 b",
+    "id": "a2",
+    "name": "商家 A2 · Riverside",
+    "templateId": "a",
+    "hostname": "a2.localhost",
+    "contentFile": "sites/a2/current.json"
+  },
+  {
+    "id": "b1",
+    "name": "商家 B1 · Market Street",
     "templateId": "b",
-    "hostname": "b.localhost",
-    "contentFile": "sites/site-b/current.json"
+    "hostname": "b1.localhost",
+    "contentFile": "sites/b1/current.json"
+  },
+  {
+    "id": "b2",
+    "name": "商家 B2 · Harbor",
+    "templateId": "b",
+    "hostname": "b2.localhost",
+    "contentFile": "sites/b2/current.json"
   }
 ]

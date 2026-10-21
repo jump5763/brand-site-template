@@ -19,6 +19,11 @@ export function getBuildSites() {
   return selectSites(process.env.BRAND_SITE_BUILD_SCOPE || "all");
 }
 
+/** @param {string} templateId */
+export function sitesForTemplate(templateId) {
+  return getBuildSites().filter((site) => site.templateId === templateId);
+}
+
 /** @param {string} host */
 export function normalizeHostname(host) {
   return host.toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
@@ -34,7 +39,7 @@ export function findSiteByHost(host) {
  * @param {string} pathname
  */
 export function publicPathname(pathname) {
-  return pathname.replace(/^\/sites\/[^/]+(?=\/|$)/, "") || "/";
+  return pathname.replace(/^\/sites\/[ab]\/[^/]+(?=\/|$)/, "") || "/";
 }
 
 /** @param {string} host @param {string} pathname @param {string} [scope] */
@@ -42,7 +47,7 @@ export function resolveSiteRequest(host, pathname, scope = "all") {
   const selected = selectSites(scope);
   const site = findSiteByHost(host);
   if (!site || !selected.some((entry) => entry.id === site.id)) return null;
-  const prefix = `/sites/${site.id}`;
+  const prefix = `/sites/${site.templateId}/${site.id}`;
   if (pathname === "/sites" || pathname.startsWith("/sites/")) {
     return pathname === prefix || pathname.startsWith(`${prefix}/`)
       ? { site, pathname }

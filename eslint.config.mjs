@@ -4,8 +4,9 @@ import nextTypescript from "eslint-config-next/typescript";
 const config = [
   ...nextVitals,
   ...nextTypescript,
-  { ignores: [".next/**", ".next-*/**", "node_modules/**", "output/**", ".playwright-cli/**"] },
+  { ignores: [".next/**", ".next-*/**", "dist/**", "node_modules/**", "output/**", ".playwright-cli/**", "templates/**"] },
   {
+    files: ["src/**/*.{ts,tsx}"],
     // Template Image receives alt text through its validated media prop.
     rules: { "jsx-a11y/alt-text": ["error", { img: [] }] },
   },
@@ -19,7 +20,7 @@ const config = [
       ],
     },
   },
-  { files: ["tailwind.config.ts"], rules: { "@typescript-eslint/no-require-imports": "off" } },
+  { files: ["**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
 ];
 
 export default config;

@@ -1,6 +1,6 @@
 {
-  "siteId": "site-b",
-  "siteUrl": "http://b.localhost:3000",
+  "siteId": "b1",
+  "siteUrl": "http://b1.localhost:3000",
   "theme": {
     "fonts": {
       "heading": "System Sans",
@@ -34,7 +34,7 @@
       "type": "header",
       "variant": "nav",
       "content": {
-        "brandName": "Fern & Grain",
+        "brandName": "Fern & Grain · Market Street",
         "items": [
           {
             "id": "nav-home",
@@ -95,7 +95,7 @@
       "type": "footer",
       "variant": "info",
       "content": {
-        "brandName": "Fern & Grain",
+        "brandName": "Fern & Grain · Market Street",
         "tagline": "Farm-direct salads and grain bowls, made fresh every morning across the Bay Area.",
         "columns": [
           {
@@ -211,7 +211,7 @@
       "id": "home",
       "path": "/",
       "metadata": {
-        "title": "Fern & Grain — Fresh Salads & Grain Bowls, Made Daily",
+        "title": "Fern & Grain · Market Street | Fresh Bowls",
         "description": "Farm-direct salads, grain bowls, cold-pressed drinks and seasonal specials made fresh every morning. Order online for pickup or delivery across the Bay Area.",
         "canonicalPath": "/",
         "robots": {
@@ -274,7 +274,7 @@
           "variant": "poster",
           "content": {
             "eyebrow": "Farm-direct kitchen",
-            "title": "Salads and grain bowls, made fresh every morning",
+            "title": "Fresh bowls in Market Street.",
             "description": "We build every bowl around produce picked within 48 hours, whole grains cooked in-house, and dressings made from scratch. Clean food, served fast.",
             "primaryAction": {
               "label": "Order Online",
@@ -757,7 +757,7 @@
       "id": "menu",
       "path": "/menu",
       "metadata": {
-        "title": "Our Menu — Salads, Grain Bowls, Sides & Drinks | Fern & Grain",
+        "title": "Fern & Grain · Market Street | Menu",
         "description": "Explore the full Fern & Grain menu: salads, grain bowls, sides, drinks, desserts and limited-time seasonal dishes. Everything is made fresh the day you order.",
         "canonicalPath": "/menu",
         "robots": {
@@ -772,7 +772,7 @@
           "variant": "hero",
           "content": {
             "eyebrow": "Our menu",
-            "title": "Our Menu",
+            "title": "The Market Street menu",
             "description": "Six categories, one standard: farm-direct produce, whole grains cooked in-house, and dressings made from scratch. Available for pickup and delivery daily.",
             "highlights": [
               {

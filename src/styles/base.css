@@ -1,8 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-@layer base {
+
   :root {
     --background: #FFFFFF;
     --foreground: #111827;
@@ -53,11 +50,12 @@
   }
 
   * {
-    @apply border-border;
+    border-color: var(--border);
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background);
+    color: var(--foreground);
     min-height: 100vh;
     font-family: var(--font-typography, ui-sans-serif, system-ui, sans-serif);
   }
@@ -66,9 +64,8 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
-}
 
-@layer components {
+
   .container-site {
     width: 100%;
     max-width: var(--site-max-width);
@@ -96,12 +93,4 @@
       font-size: 48px;
     }
   }
-}
 
-/* Preserve template A anchor behavior without changing template B. */
-html[data-template="a"] { scroll-behavior: smooth; }
-html[data-template="a"] section[id],
-html[data-template="a"] [data-codeforma-layout-slot] { scroll-margin-top: 96px; }
-@media (prefers-reduced-motion: reduce) {
-  html[data-template="a"] { scroll-behavior: auto; }
-}

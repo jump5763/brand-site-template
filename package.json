@@ -12,7 +12,7 @@
     "schema:generate": "node scripts/sites.mjs schema:generate",
     "schema:check": "node scripts/sites.mjs schema:check",
     "validate:site": "node scripts/sites.mjs validate",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "node scripts/sites.mjs typecheck",
     "lint": "eslint .",
     "test": "node --test tests/*.test.mjs"
   },
