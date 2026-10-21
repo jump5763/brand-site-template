@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/story.about",
+  "title": "Brand Story",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eyebrow", "title", "description", "body", "media", "secondaryMedia", "stats", "action"],
+  "properties": {
+    "eyebrow": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1, "description": "Rendered as this section's h2." },
+    "description": { "type": "string", "minLength": 1 },
+    "body": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "media": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" },
+    "secondaryMedia": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" },
+    "stats": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/storyStat" } },
+    "action": { "$ref": "https://codeforma.local/site-schema/core#/$defs/siteAction" }
+  },
+  "$defs": {
+    "storyStat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "value", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

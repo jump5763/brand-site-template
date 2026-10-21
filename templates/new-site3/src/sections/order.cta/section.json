@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "order.cta",
+  "type": "order",
+  "variant": "cta",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Order Call To Action",
+    "description": "High-contrast brand-colour panel with ordering message, primary and secondary actions, perk list and a footnote. Renders one h2.",
+    "useWhen": ["The page needs a prominent ordering call to action"],
+    "avoidWhen": ["The page already ends in a different closing action"],
+    "rendering": "server"
+  }
+}

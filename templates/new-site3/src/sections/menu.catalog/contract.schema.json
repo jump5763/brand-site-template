@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/menu.catalog",
+  "title": "Menu Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eyebrow", "title", "description", "allLabel", "categories", "sorts", "dishes", "resultsLabel", "emptyState", "priceNote"],
+  "properties": {
+    "eyebrow": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1, "description": "Rendered as this section's h2." },
+    "description": { "type": "string", "minLength": 1 },
+    "allLabel": { "type": "string", "minLength": 1, "description": "Label of the unfiltered category option, always rendered first." },
+    "categories": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/menuCategory" } },
+    "sorts": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/menuSort" } },
+    "dishes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/menuDish" } },
+    "resultsLabel": { "type": "string", "minLength": 1, "description": "Unit noun for the visible result count, e.g. \"dishes\"." },
+    "emptyState": { "type": "string", "minLength": 1 },
+    "priceNote": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "menuCategory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "menuSort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "enum": ["featured", "price-asc", "price-desc", "name-asc"] },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "menuDish": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "price", "categoryId", "tags", "media"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "price": { "type": "number", "exclusiveMinimum": 0 },
+        "categoryId": { "type": "string", "minLength": 1, "description": "Must match one of the category ids." },
+        "calories": { "type": "integer", "minimum": 0 },
+        "badge": { "type": "string", "minLength": 1 },
+        "tags": { "type": "array", "items": { "type": "string", "enum": ["Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free", "High Protein", "Spicy", "Paleo", "Seasonal", "Low Calorie"] } },
+        "media": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" }
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "new-site3",
+  "templateVersion": "1.0.0",
+  "name": "Root & Grain 餐饮品牌官网",
+  "description": "健康轻食餐饮品牌官网，包含品牌首页、季节菜单、食材溯源、门店介绍与菜单详情页；通过 current.json 配置内容与主题。",
+  "tags": [
+    "restaurant",
+    "food",
+    "brand"
+  ],
+  "formatVersion": 1,
+  "projectRoot": ".",
+  "contentFile": "src/site-schema/current.json",
+  "preview": {
+    "pagePath": "/",
+    "cover": "previews/cover.png",
+    "width": 1600,
+    "height": 900
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "example.default",
+  "type": "example",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Example Section",
+    "description": "Replace this description with the capability provided by the Section.",
+    "useWhen": ["Replace with a concrete use case"],
+    "avoidWhen": ["Replace with a nearby capability"],
+    "rendering": "server"
+  }
+}

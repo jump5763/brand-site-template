@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "ingredients.fresh",
+  "type": "ingredients",
+  "variant": "fresh",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Fresh Ingredients",
+    "description": "Grid of sourcing or ingredient proof points with photo, icon badge, title and description. Renders one h2 and one h3 per item title.",
+    "useWhen": ["The brand should explain how ingredients are sourced"],
+    "avoidWhen": ["The block is about people or history (use a story capability)"],
+    "rendering": "server"
+  }
+}

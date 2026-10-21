@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "menu.seasonal",
+  "type": "menu",
+  "variant": "seasonal",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Seasonal Favorites",
+    "description": "Swipeable carousel of seasonal or new dishes with image, name, description, price, tags and badge. Renders one h2 and one h3 per dish name.",
+    "useWhen": ["A page should spotlight a handful of new or seasonal dishes"],
+    "avoidWhen": ["The full filterable menu is required (use a catalog capability)"],
+    "rendering": "client-island"
+  }
+}

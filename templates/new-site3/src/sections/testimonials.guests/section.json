@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "testimonials.guests",
+  "type": "testimonials",
+  "variant": "guests",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Guest Reviews",
+    "description": "Marquee of guest review cards that scrolls continuously and loops seamlessly, with star rating, quote, avatar, name, location detail and favourite dish. Pauses on hover, on keyboard focus, or via a pause control, and stops entirely for reduced-motion users. Renders one h2; guest names and ratings are not headings.",
+    "useWhen": ["The page needs social proof from real guests"],
+    "avoidWhen": ["The content is editorial brand storytelling (use a story capability)"],
+    "rendering": "client-island"
+  }
+}

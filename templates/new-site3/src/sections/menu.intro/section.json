@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "menu.intro",
+  "type": "menu",
+  "variant": "intro",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Menu Intro",
+    "description": "Menu page opening block that provides the page h1 with eyebrow, description, sourcing note, proof-point highlights and a dish photo. Renders one h1.",
+    "useWhen": ["A menu page needs its opening heading and summary"],
+    "avoidWhen": ["The page needs the filterable dish list (use a catalog capability)"],
+    "rendering": "server"
+  }
+}

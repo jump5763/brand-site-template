@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "site.header",
+  "type": "site",
+  "variant": "header",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Site Header",
+    "description": "Fixed top navigation bar with brand wordmark, page navigation, a primary order call-to-action and a mobile sheet menu. Renders no headings; it is a navigation landmark only.",
+    "useWhen": ["A page needs the shared site navigation bar at the top of the viewport"],
+    "avoidWhen": ["The page needs an in-page hero or heading (use a hero capability)"],
+    "rendering": "client-island"
+  }
+}

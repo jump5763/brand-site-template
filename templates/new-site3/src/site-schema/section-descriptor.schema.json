@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/schema/section-descriptor.schema.json",
+  "title": "Section Descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "type",
+    "variant",
+    "contract",
+    "definition",
+    "capability"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "variant": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "contract": { "$ref": "#/$defs/localPath" },
+    "definition": { "$ref": "#/$defs/localPath" },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "description", "useWhen", "avoidWhen", "rendering"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "useWhen": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "avoidWhen": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "rendering": { "enum": ["server", "client-island"] }
+      }
+    }
+  },
+  "$defs": {
+    "localPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!\\\\)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*//)\\./[^/].*$"
+    }
+  }
+}

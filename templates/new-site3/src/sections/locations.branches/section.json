@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "locations.branches",
+  "type": "locations",
+  "variant": "branches",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Store Locations",
+    "description": "Google Maps embed beside a list of store cards with address, phone, opening hours and services. Renders one h2 and one h3 per store name.",
+    "useWhen": ["The page should show where the restaurants are and when they are open"],
+    "avoidWhen": ["The addresses belong in the footer only"],
+    "rendering": "server"
+  }
+}
