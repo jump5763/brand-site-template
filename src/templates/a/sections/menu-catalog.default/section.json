@@ -1,0 +1,15 @@
+{
+  "placement": "page",
+  "id": "menu-catalog.default",
+  "type": "menu-catalog",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Filterable Menu Catalog",
+    "description": "Interactive menu board: category tabs, multi-select dietary filter chips, a sort control, a live result count, an empty state and dish cards grouped under a category sub-heading with photograph, description, price, calories and optional badge.",
+    "useWhen": ["Guests must browse every dish and narrow it down by category, diet or price"],
+    "avoidWhen": ["Only a few hand-picked dishes need to be shown, which the Seasonal Picks block already covers"],
+    "rendering": "client-island"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "seasonal.grid",
+  "type": "seasonal",
+  "variant": "grid",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Seasonal New Items Grid",
+    "description": "Responsive grid of seasonal items, each with a badge over its photo plus name, description, and price, with an optional link below.",
+    "useWhen": [
+      "A fixed set of new or seasonal items should be compared in one view",
+      "Each item needs a short seasonal label over its photo"
+    ],
+    "avoidWhen": [
+      "The item list is long enough to need horizontal browsing",
+      "The items carry no seasonal label"
+    ],
+    "rendering": "server"
+  }
+}

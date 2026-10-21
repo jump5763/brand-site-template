@@ -1,0 +1,15 @@
+{
+  "placement": "page",
+  "id": "testimonials.default",
+  "type": "testimonials",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Guest Reviews",
+    "description": "Customer review grid: each card shows a star rating, a quoted review and an attribution line. Quotes stay non-heading content so the section keeps a single h2.",
+    "useWhen": ["A page should show social proof from guests or reviewers"],
+    "avoidWhen": ["The page needs press coverage logos or award badges instead of guest quotes"],
+    "rendering": "server"
+  }
+}

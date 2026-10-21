@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "ingredients.story",
+  "type": "ingredients",
+  "variant": "story",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Farm Sourcing Story",
+    "description": "Two-column sourcing story that pairs a farm photograph with a heading, supporting facts, an optional link, and a band of headline numbers.",
+    "useWhen": [
+      "A page should explain where its ingredients come from",
+      "Provenance facts and headline numbers belong beside a sourcing photo"
+    ],
+    "avoidWhen": [
+      "The claim is a single sentence without facts or numbers",
+      "No sourcing photo is available"
+    ],
+    "rendering": "server"
+  }
+}

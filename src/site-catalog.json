@@ -1,0 +1,16 @@
+[
+  {
+    "id": "site-a",
+    "name": "模板 a",
+    "templateId": "a",
+    "hostname": "a.localhost",
+    "contentFile": "sites/site-a/current.json"
+  },
+  {
+    "id": "site-b",
+    "name": "模板 b",
+    "templateId": "b",
+    "hostname": "b.localhost",
+    "contentFile": "sites/site-b/current.json"
+  }
+]

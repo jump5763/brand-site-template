@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #FFFFFF;
+    --foreground: #111827;
+    --card: #FFFFFF;
+    --card-foreground: #111827;
+    --popover: #FFFFFF;
+    --popover-foreground: #111827;
+    --primary: #111827;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F3F4F6;
+    --secondary-foreground: #111827;
+    --muted: #F3F4F6;
+    --muted-foreground: #6B7280;
+    --accent: #F3F4F6;
+    --accent-foreground: #111827;
+    --destructive: #DC2828;
+    --destructive-foreground: #FFFFFF;
+    --border: #E5E7EB;
+    --input: #E5E7EB;
+    --ring: #3C83F6;
+    --chart-1: #3C83F6;
+    --chart-2: #21C45D;
+    --chart-3: #F59F0A;
+    --chart-4: #7C3BED;
+    --chart-5: #DC2828;
+    --sidebar-background: #FFFFFF;
+    --sidebar-foreground: #111827;
+    --sidebar-primary: #111827;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #F3F4F6;
+    --sidebar-accent-foreground: #111827;
+    --sidebar-border: #E5E7EB;
+    --sidebar-ring: #3C83F6;
+    --radius: 8px;
+    /* Shared layout defaults for SiteContainer and Section. */
+    --site-max-width: 1760px;
+    --site-gutter-x: 16px;
+    --section-space-y: 64px;
+    --section-space-y-spacious: 72px;
+  }
+
+  @media (min-width: 769px) {
+    :root {
+      --site-gutter-x: 40px;
+      --section-space-y: 96px;
+      --section-space-y-spacious: 104px;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    font-family: var(--font-typography, ui-sans-serif, system-ui, sans-serif);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .container-site {
+    width: 100%;
+    max-width: var(--site-max-width);
+    margin-inline: auto;
+    padding-inline: var(--site-gutter-x);
+  }
+
+  .t-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .t-h2 {
+    font-family: var(--font-heading, ui-serif, Georgia, serif);
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  @media (min-width: 769px) {
+    .t-h2 {
+      font-size: 48px;
+    }
+  }
+}
+
+/* Preserve template A anchor behavior without changing template B. */
+html[data-template="a"] { scroll-behavior: smooth; }
+html[data-template="a"] section[id],
+html[data-template="a"] [data-codeforma-layout-slot] { scroll-margin-top: 96px; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-template="a"] { scroll-behavior: auto; }
+}

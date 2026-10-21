@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "order.channels",
+  "type": "order",
+  "variant": "channels",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Ordering Channels",
+    "description": "Display-only ordering guide that lists the pickup, delivery, and catering channels with an icon, a description, an optional link, and a closing note.",
+    "useWhen": [
+      "A page should explain how guests can order without taking the order itself",
+      "Pickup, delivery, and catering options need a short side-by-side comparison"
+    ],
+    "avoidWhen": [
+      "The page must capture, submit, or pay for an order",
+      "One ordering channel needs only a single sentence of context"
+    ],
+    "rendering": "server"
+  }
+}

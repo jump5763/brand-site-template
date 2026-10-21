@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "testimonials.grid",
+  "type": "testimonials",
+  "variant": "grid",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Guest Review Grid",
+    "description": "Responsive grid of guest reviews, each with a star rating, a quoted testimonial, and the reviewer's photo, name, and role.",
+    "useWhen": [
+      "A page should show several guest reviews with ratings at once",
+      "Each review carries a reviewer photo, name, and role"
+    ],
+    "avoidWhen": [
+      "The feedback is a single long case study rather than short quotes",
+      "Reviews have no rating or reviewer photo"
+    ],
+    "rendering": "server"
+  }
+}

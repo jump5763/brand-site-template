@@ -1,0 +1,15 @@
+{
+  "placement": "page",
+  "id": "contact.default",
+  "type": "contact",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Contact & Message Form",
+    "description": "Contact block with labelled contact channels and a validated message form (name, email, topic, message) that confirms success inline and with a toast.",
+    "useWhen": ["Visitors must reach the team for questions, catering or careers and a written form is expected"],
+    "avoidWhen": ["The only requirement is to list kitchen addresses and opening hours"],
+    "rendering": "client-island"
+  }
+}

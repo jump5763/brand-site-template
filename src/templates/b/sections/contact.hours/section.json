@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "contact.hours",
+  "type": "contact",
+  "variant": "hours",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Contact & Hours",
+    "description": "Two-column contact block that lists email, phone, and catering channels beside a panel of opening hours with an optional label, note, and link.",
+    "useWhen": [
+      "A page should publish contact channels and opening hours together",
+      "Guests need to know when a location is open and how to reach it"
+    ],
+    "avoidWhen": [
+      "Only opening hours or only contact details are needed",
+      "The content is a full support or FAQ section rather than a short contact block"
+    ],
+    "rendering": "server"
+  }
+}

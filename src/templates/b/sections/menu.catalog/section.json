@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "menu.catalog",
+  "type": "menu",
+  "variant": "catalog",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Menu Catalog",
+    "description": "Filterable, sortable menu catalog with category tabs, dietary filter toggles, a sort control, and dish cards showing photo, badges, description, and price.",
+    "useWhen": [
+      "A menu page should let visitors focus on one category at a time",
+      "Visitors should filter dishes by dietary badges and sort by price or name"
+    ],
+    "avoidWhen": [
+      "Only a small fixed selection of dishes is shown without browsing controls",
+      "The dishes carry no category or dietary badge data"
+    ],
+    "rendering": "client-island"
+  }
+}

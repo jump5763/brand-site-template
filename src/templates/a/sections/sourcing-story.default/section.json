@@ -1,0 +1,15 @@
+{
+  "placement": "page",
+  "id": "sourcing-story.default",
+  "type": "sourcing-story",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Sourcing Story",
+    "description": "Farm-to-table ingredient story: a heading with two paragraphs beside a produce or farm photograph, a sage band of farm statistics, and a grid of preparation practices with their own sub-headings.",
+    "useWhen": ["The brand story is about ingredient sourcing, farm partners and kitchen craft"],
+    "avoidWhen": ["The block is really about the people behind the brand, or about a single product"],
+    "rendering": "server"
+  }
+}

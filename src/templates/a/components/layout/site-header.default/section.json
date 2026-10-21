@@ -1,0 +1,15 @@
+{
+  "placement": "layout.header",
+  "id": "site-header.default",
+  "type": "site-header",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Site Header",
+    "description": "Sticky site-wide header for a restaurant brand: wordmark link, primary navigation resolved from page and external targets, a permanent Order Now action, and a mobile navigation sheet. It renders once from layout.header and owns no page h1.",
+    "useWhen": ["Every page needs the shared brand navigation and the ordering entry point"],
+    "avoidWhen": ["A single page needs a local in-content navigation strip or section jump bar"],
+    "rendering": "client-island"
+  }
+}

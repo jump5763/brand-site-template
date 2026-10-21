@@ -1,0 +1,21 @@
+{
+  "placement": "layout.header",
+  "id": "header.nav",
+  "type": "header",
+  "variant": "nav",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Site Header Navigation",
+    "description": "Fixed site header with the brand wordmark, active-aware desktop navigation, a primary call to action, and a mobile sheet menu.",
+    "useWhen": [
+      "The site needs one shared header rendered across every page",
+      "Primary navigation and a single call to action should stay pinned to the top"
+    ],
+    "avoidWhen": [
+      "A page needs its own local navigation rather than the site-wide header",
+      "Navigation must render below the first screen"
+    ],
+    "rendering": "client-island"
+  }
+}

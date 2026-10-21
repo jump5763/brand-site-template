@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/order-cta.default",
+  "title": "Order Call To Action",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "variant", "content"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "type": { "const": "order-cta" },
+    "variant": { "const": "default" },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eyebrow",
+        "title",
+        "description",
+        "primaryAction",
+        "secondaryAction",
+        "image"
+      ],
+      "properties": {
+        "eyebrow": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "primaryAction": { "$ref": "https://codeforma.local/site-schema/core#/$defs/siteAction" },
+        "secondaryAction": { "$ref": "https://codeforma.local/site-schema/core#/$defs/siteAction" },
+        "image": { "$ref": "https://codeforma.local/site-schema/core#/$defs/media" }
+      }
+    }
+  }
+}

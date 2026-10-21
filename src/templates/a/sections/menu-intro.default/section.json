@@ -1,0 +1,15 @@
+{
+  "placement": "page",
+  "id": "menu-intro.default",
+  "type": "menu-intro",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Menu Intro Banner",
+    "description": "Compact menu page opener that owns the page h1: eyebrow, headline, supporting paragraph, a short row of service notes and one wide food photograph.",
+    "useWhen": ["A menu or catalogue page needs its h1 and a visual opener above the filters"],
+    "avoidWhen": ["The page already opens with a full-viewport hero"],
+    "rendering": "server"
+  }
+}

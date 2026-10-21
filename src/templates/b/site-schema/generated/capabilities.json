@@ -1,0 +1,531 @@
+[
+  {
+    "id": "carousel.signature",
+    "type": "carousel",
+    "variant": "signature",
+    "placement": "page",
+    "title": "Signature Dish Carousel",
+    "description": "Autoplaying, horizontally scrollable carousel of signature dishes, each with a photo, optional tag, name, description, and price, plus an optional link to more.",
+    "useWhen": [
+      "Several signature dishes should be browsed one at a time or side by side",
+      "A moving showcase of menu highlights with prices is wanted above a link to the full menu"
+    ],
+    "avoidWhen": [
+      "Every item must stay visible at once",
+      "The items have no photo or price"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "required": false
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "contact.hours",
+    "type": "contact",
+    "variant": "hours",
+    "placement": "page",
+    "title": "Contact & Hours",
+    "description": "Two-column contact block that lists email, phone, and catering channels beside a panel of opening hours with an optional label, note, and link.",
+    "useWhen": [
+      "A page should publish contact channels and opening hours together",
+      "Guests need to know when a location is open and how to reach it"
+    ],
+    "avoidWhen": [
+      "Only opening hours or only contact details are needed",
+      "The content is a full support or FAQ section rather than a short contact block"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "hoursLabel",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "name": "hoursNote",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "required": false
+      },
+      {
+        "name": "channels",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "hours",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "footer.info",
+    "type": "footer",
+    "variant": "info",
+    "placement": "layout.footer",
+    "title": "Site Footer",
+    "description": "Shared site footer with the brand mark and tagline, link columns, contact details, opening hours, and a bottom copyright bar.",
+    "useWhen": [
+      "The site needs one shared footer rendered across every page",
+      "Link columns, contact details, and hours should appear together below the content"
+    ],
+    "avoidWhen": [
+      "A page needs a local end-of-page block rather than the site-wide footer",
+      "There are no link columns, contact details, or hours to list"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "brandName",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "tagline",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "note",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "name": "copyright",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "columns",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "contact",
+        "required": true,
+        "type": "object"
+      },
+      {
+        "name": "hours",
+        "required": true,
+        "type": "object"
+      }
+    ]
+  },
+  {
+    "id": "header.nav",
+    "type": "header",
+    "variant": "nav",
+    "placement": "layout.header",
+    "title": "Site Header Navigation",
+    "description": "Fixed site header with the brand wordmark, active-aware desktop navigation, a primary call to action, and a mobile sheet menu.",
+    "useWhen": [
+      "The site needs one shared header rendered across every page",
+      "Primary navigation and a single call to action should stay pinned to the top"
+    ],
+    "avoidWhen": [
+      "A page needs its own local navigation rather than the site-wide header",
+      "Navigation must render below the first screen"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "brandName",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "cta",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "hero.poster",
+    "type": "hero",
+    "variant": "poster",
+    "placement": "page",
+    "title": "Poster Hero",
+    "description": "Full-screen photo opener with an eyebrow, the page headline, a description, a primary and optional secondary action, and supporting badges.",
+    "useWhen": [
+      "A page needs one above-the-fold opener built on a single strong photograph",
+      "The page headline and its main call to action must appear immediately"
+    ],
+    "avoidWhen": [
+      "A hero already opens the same page",
+      "The opening statement needs no imagery or supporting badges"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "primaryAction",
+        "required": true
+      },
+      {
+        "name": "secondaryAction",
+        "required": false
+      },
+      {
+        "name": "badges",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "media",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "ingredients.story",
+    "type": "ingredients",
+    "variant": "story",
+    "placement": "page",
+    "title": "Farm Sourcing Story",
+    "description": "Two-column sourcing story that pairs a farm photograph with a heading, supporting facts, an optional link, and a band of headline numbers.",
+    "useWhen": [
+      "A page should explain where its ingredients come from",
+      "Provenance facts and headline numbers belong beside a sourcing photo"
+    ],
+    "avoidWhen": [
+      "The claim is a single sentence without facts or numbers",
+      "No sourcing photo is available"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "media",
+        "required": true
+      },
+      {
+        "name": "action",
+        "required": false
+      },
+      {
+        "name": "facts",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "stats",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "locations.stores",
+    "type": "locations",
+    "variant": "stores",
+    "placement": "page",
+    "title": "Store Locations & Map",
+    "description": "Directory of store locations that pairs a details card per store, with photo, address, hours, phone, and a directions link, with one embedded map of all locations.",
+    "useWhen": [
+      "A page should list physical store locations with their address, hours, and phone",
+      "Guests need a map and per-store directions for the same set of locations"
+    ],
+    "avoidWhen": [
+      "There are no physical locations to visit",
+      "A single address needs only one line of copy without a map"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "map",
+        "required": true,
+        "type": "object"
+      },
+      {
+        "name": "stores",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "menu.catalog",
+    "type": "menu",
+    "variant": "catalog",
+    "placement": "page",
+    "title": "Menu Catalog",
+    "description": "Filterable, sortable menu catalog with category tabs, dietary filter toggles, a sort control, and dish cards showing photo, badges, description, and price.",
+    "useWhen": [
+      "A menu page should let visitors focus on one category at a time",
+      "Visitors should filter dishes by dietary badges and sort by price or name"
+    ],
+    "avoidWhen": [
+      "Only a small fixed selection of dishes is shown without browsing controls",
+      "The dishes carry no category or dietary badge data"
+    ],
+    "rendering": "client-island",
+    "contentFields": [
+      {
+        "name": "categories",
+        "required": true,
+        "type": "array"
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "menu.hero",
+    "type": "menu",
+    "variant": "hero",
+    "placement": "page",
+    "title": "Menu Page Header",
+    "description": "Menu page opener with an eyebrow, the page headline, a description, and a row of highlight pills; it owns the menu page h1.",
+    "useWhen": [
+      "The menu page needs its single h1 and a short introduction above the catalog",
+      "A few scan-friendly highlights should sit under the menu headline"
+    ],
+    "avoidWhen": [
+      "The page already has an opener or h1",
+      "The menu page needs filtering or sorting rather than an introduction"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "highlights",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "order.channels",
+    "type": "order",
+    "variant": "channels",
+    "placement": "page",
+    "title": "Ordering Channels",
+    "description": "Display-only ordering guide that lists the pickup, delivery, and catering channels with an icon, a description, an optional link, and a closing note.",
+    "useWhen": [
+      "A page should explain how guests can order without taking the order itself",
+      "Pickup, delivery, and catering options need a short side-by-side comparison"
+    ],
+    "avoidWhen": [
+      "The page must capture, submit, or pay for an order",
+      "One ordering channel needs only a single sentence of context"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "note",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "seasonal.grid",
+    "type": "seasonal",
+    "variant": "grid",
+    "placement": "page",
+    "title": "Seasonal New Items Grid",
+    "description": "Responsive grid of seasonal items, each with a badge over its photo plus name, description, and price, with an optional link below.",
+    "useWhen": [
+      "A fixed set of new or seasonal items should be compared in one view",
+      "Each item needs a short seasonal label over its photo"
+    ],
+    "avoidWhen": [
+      "The item list is long enough to need horizontal browsing",
+      "The items carry no seasonal label"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "required": false
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  },
+  {
+    "id": "testimonials.grid",
+    "type": "testimonials",
+    "variant": "grid",
+    "placement": "page",
+    "title": "Guest Review Grid",
+    "description": "Responsive grid of guest reviews, each with a star rating, a quoted testimonial, and the reviewer's photo, name, and role.",
+    "useWhen": [
+      "A page should show several guest reviews with ratings at once",
+      "Each review carries a reviewer photo, name, and role"
+    ],
+    "avoidWhen": [
+      "The feedback is a single long case study rather than short quotes",
+      "Reviews have no rating or reviewer photo"
+    ],
+    "rendering": "server",
+    "contentFields": [
+      {
+        "name": "eyebrow",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "items",
+        "required": true,
+        "type": "array"
+      }
+    ]
+  }
+]

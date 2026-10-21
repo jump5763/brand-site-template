@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeforma.local/sections/site-header.default",
+  "title": "Site Header",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "variant", "content"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "type": { "const": "site-header" },
+    "variant": { "const": "default" },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "brandName",
+        "nav",
+        "orderAction",
+        "openMenuLabel",
+        "closeMenuLabel",
+        "sheetTitle"
+      ],
+      "properties": {
+        "brandName": { "type": "string", "minLength": 1 },
+        "nav": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "target"],
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "target": { "$ref": "https://codeforma.local/site-schema/core#/$defs/linkTarget" }
+            }
+          }
+        },
+        "orderAction": { "$ref": "https://codeforma.local/site-schema/core#/$defs/siteAction" },
+        "openMenuLabel": { "type": "string", "minLength": 1 },
+        "closeMenuLabel": { "type": "string", "minLength": 1 },
+        "sheetTitle": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

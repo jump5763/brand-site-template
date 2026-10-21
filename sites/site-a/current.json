@@ -1,0 +1,1137 @@
+{
+  "siteId": "site-a",
+  "siteUrl": "http://a.localhost:3000",
+  "theme": {
+    "fonts": {
+      "heading": "System Sans",
+      "typography": "System Sans"
+    },
+    "colors": {
+      "background": "#FAF7F1",
+      "foreground": "#232A28",
+      "card": "#FFFFFF",
+      "cardForeground": "#232A28",
+      "popover": "#FFFFFF",
+      "popoverForeground": "#232A28",
+      "primary": "#14453D",
+      "primaryForeground": "#F7F4EC",
+      "secondary": "#E6EDE6",
+      "secondaryForeground": "#14453D",
+      "muted": "#F1EDE3",
+      "mutedForeground": "#5E6A65",
+      "accent": "#E6EDE6",
+      "accentForeground": "#14453D",
+      "destructive": "#B3261E",
+      "destructiveForeground": "#FFFFFF",
+      "border": "#E2DCD0",
+      "input": "#E2DCD0",
+      "ring": "#14453D"
+    }
+  },
+  "layout": {
+    "header": {
+      "id": "site-header",
+      "type": "site-header",
+      "variant": "default",
+      "content": {
+        "brandName": "Fern & Grain",
+        "nav": [
+          {
+            "label": "Home",
+            "target": {
+              "kind": "page",
+              "pageId": "home"
+            }
+          },
+          {
+            "label": "Menu",
+            "target": {
+              "kind": "page",
+              "pageId": "menu"
+            }
+          },
+          {
+            "label": "Order Online",
+            "target": {
+              "kind": "external",
+              "href": "https://order.toasttab.com/online/fern-and-grain"
+            }
+          },
+          {
+            "label": "Locations",
+            "target": {
+              "kind": "page",
+              "pageId": "home",
+              "fragment": "locations"
+            }
+          },
+          {
+            "label": "About Us",
+            "target": {
+              "kind": "page",
+              "pageId": "home",
+              "fragment": "about"
+            }
+          },
+          {
+            "label": "Contact",
+            "target": {
+              "kind": "page",
+              "pageId": "home",
+              "fragment": "contact"
+            }
+          }
+        ],
+        "orderAction": {
+          "label": "Order Now",
+          "target": {
+            "kind": "external",
+            "href": "https://order.toasttab.com/online/fern-and-grain"
+          }
+        },
+        "openMenuLabel": "Open navigation menu",
+        "closeMenuLabel": "Close navigation menu",
+        "sheetTitle": "Navigation"
+      }
+    },
+    "footer": {
+      "id": "site-footer",
+      "type": "site-footer",
+      "variant": "default",
+      "content": {
+        "brandName": "Fern & Grain",
+        "brandDescription": "A fast-casual kitchen for chopped salads, warm grain bowls and cold-pressed drinks, built on produce harvested within 120 miles of Washington, DC.",
+        "orderAction": {
+          "label": "Order Now",
+          "target": {
+            "kind": "external",
+            "href": "https://order.toasttab.com/online/fern-and-grain"
+          }
+        },
+        "newsletter": {
+          "title": "Get the seasonal menu first",
+          "description": "One email each season with the dishes we are about to cook — never daily noise.",
+          "emailLabel": "Email address",
+          "placeholder": "you@example.com",
+          "submitLabel": "Subscribe",
+          "successMessage": "You are on the list. Our next seasonal menu lands in your inbox.",
+          "privacyNote": "At most one email a month. We never share your address."
+        },
+        "navGroups": [
+          {
+            "title": "Explore",
+            "links": [
+              {
+                "label": "Home",
+                "target": {
+                  "kind": "page",
+                  "pageId": "home"
+                }
+              },
+              {
+                "label": "Menu",
+                "target": {
+                  "kind": "page",
+                  "pageId": "menu"
+                }
+              },
+              {
+                "label": "Locations",
+                "target": {
+                  "kind": "page",
+                  "pageId": "home",
+                  "fragment": "locations"
+                }
+              },
+              {
+                "label": "About Us",
+                "target": {
+                  "kind": "page",
+                  "pageId": "home",
+                  "fragment": "about"
+                }
+              }
+            ]
+          },
+          {
+            "title": "Order",
+            "links": [
+              {
+                "label": "Order Online",
+                "target": {
+                  "kind": "external",
+                  "href": "https://order.toasttab.com/online/fern-and-grain"
+                }
+              },
+              {
+                "label": "Catering",
+                "target": {
+                  "kind": "page",
+                  "pageId": "home",
+                  "fragment": "contact"
+                }
+              },
+              {
+                "label": "Pickup & Delivery",
+                "target": {
+                  "kind": "page",
+                  "pageId": "home",
+                  "fragment": "locations"
+                }
+              }
+            ]
+          }
+        ],
+        "stores": [
+          {
+            "name": "Union Market",
+            "addressLines": [
+              "1309 5th Street NE",
+              "Washington, DC 20002"
+            ],
+            "phone": "(202) 555-0142"
+          },
+          {
+            "name": "Dupont Circle",
+            "addressLines": [
+              "1527 Connecticut Avenue NW",
+              "Washington, DC 20036"
+            ],
+            "phone": "(202) 555-0188"
+          },
+          {
+            "name": "Bethesda Row",
+            "addressLines": [
+              "7112 Woodmont Avenue",
+              "Bethesda, MD 20814"
+            ],
+            "phone": "(301) 555-0134"
+          }
+        ],
+        "hoursTitle": "Kitchen hours",
+        "hoursLines": [
+          "Monday – Thursday · 10:30am – 9:00pm",
+          "Friday – Saturday · 10:30am – 10:00pm",
+          "Sunday · 11:00am – 8:00pm"
+        ],
+        "socialTitle": "Follow along",
+        "social": [
+          {
+            "label": "Instagram",
+            "href": "https://www.instagram.com/fernandgrain"
+          },
+          {
+            "label": "Facebook",
+            "href": "https://www.facebook.com/fernandgrain"
+          },
+          {
+            "label": "TikTok",
+            "href": "https://www.tiktok.com/@fernandgrain"
+          }
+        ],
+        "legalLinks": [
+          {
+            "label": "Privacy Policy",
+            "target": {
+              "kind": "external",
+              "href": "https://www.fernandgrain.com/privacy"
+            }
+          },
+          {
+            "label": "Terms of Service",
+            "target": {
+              "kind": "external",
+              "href": "https://www.fernandgrain.com/terms"
+            }
+          },
+          {
+            "label": "Accessibility",
+            "target": {
+              "kind": "external",
+              "href": "https://www.fernandgrain.com/accessibility"
+            }
+          }
+        ],
+        "copyright": "© 2025 Fern & Grain Kitchens. All rights reserved."
+      }
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "path": "/",
+      "metadata": {
+        "title": "Fern & Grain | Fresh Salads & Grain Bowls",
+        "description": "Fern & Grain is a fast-casual kitchen serving chopped salads, warm grain bowls and cold-pressed drinks made fresh each morning with produce harvested within 120 miles of Washington, DC.",
+        "canonicalPath": "/",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "structuredData": {
+          "@context": "https://schema.org",
+          "@type": "Restaurant",
+          "name": "Fern & Grain",
+          "description": "Fast-casual kitchen for chopped salads, warm grain bowls and cold-pressed drinks sourced from farms within 120 miles of Washington, DC.",
+          "servesCuisine": [
+            "Salads",
+            "Grain Bowls",
+            "Healthy",
+            "Fast Casual"
+          ],
+          "priceRange": "$$",
+          "url": "http://localhost:3000/",
+          "telephone": "+1-202-555-0142",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "1309 5th Street NE",
+            "addressLocality": "Washington",
+            "addressRegion": "DC",
+            "postalCode": "20002",
+            "addressCountry": "US"
+          },
+          "openingHours": [
+            "Mo-Th 10:30-21:00",
+            "Fr-Sa 10:30-22:00",
+            "Su 11:00-20:00"
+          ],
+          "hasMenu": "http://localhost:3000/menu"
+        }
+      },
+      "sections": [
+        {
+          "id": "hero",
+          "type": "hero",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Seasonal Kitchen · Est. 2014",
+            "title": "Real food, from farms we know.",
+            "description": "Chef-built salads, warm grain bowls and cold-pressed drinks made fresh every morning with produce harvested within 120 miles of our kitchens.",
+            "primaryAction": {
+              "label": "Order Now",
+              "target": {
+                "kind": "external",
+                "href": "https://order.toasttab.com/online/fern-and-grain"
+              }
+            },
+            "secondaryAction": {
+              "label": "View Menu",
+              "target": {
+                "kind": "page",
+                "pageId": "menu"
+              }
+            },
+            "badges": [
+              "Harvested within 120 miles",
+              "No seed oils, ever",
+              "Compostable packaging"
+            ],
+            "image": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=2400&q=80",
+              "alt": "Bright natural-light table of fresh salads, vegetables and grain bowls"
+            }
+          }
+        },
+        {
+          "id": "seasonal",
+          "type": "seasonal-picks",
+          "variant": "default",
+          "content": {
+            "eyebrow": "New This Season",
+            "title": "What's peaking right now",
+            "description": "Three plates our chefs built around this week's harvest, available while the fields keep up.",
+            "action": {
+              "label": "See the full menu",
+              "target": {
+                "kind": "page",
+                "pageId": "menu"
+              }
+            },
+            "items": [
+              {
+                "name": "Charred Corn & Avocado Bowl",
+                "description": "Grilled sweet corn, avocado, pickled onion, cilantro-lime rice, cotija and jalapeño vinaigrette.",
+                "price": "$14.50",
+                "badge": "New",
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Charred corn and avocado salad bowl with fresh herbs"
+                }
+              },
+              {
+                "name": "Heirloom Panzanella",
+                "description": "Heirloom tomatoes, torn sourdough, cucumber, basil, aged balsamic and cold-pressed olive oil.",
+                "price": "$13.25",
+                "badge": "Seasonal",
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Heirloom tomato and bread salad served on a ceramic plate"
+                }
+              },
+              {
+                "name": "Stone Fruit & Kale",
+                "description": "Massaged kale, shaved fennel, ripe peaches, toasted almonds, pecorino and honey-lemon dressing.",
+                "price": "$14.00",
+                "badge": "Limited Time",
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1494390248081-4e521a5940db?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Green kale salad topped with sliced stone fruit and almonds"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "about",
+          "type": "sourcing-story",
+          "variant": "default",
+          "content": {
+            "eyebrow": "From Our Farms",
+            "title": "Rooted in real ingredients",
+            "description": "We opened with one kitchen, two farmers and a simple idea: food tastes better when you know where it grew.",
+            "body": "Every morning our prep teams break down whole produce delivered overnight from growers across the Mid-Atlantic. Nothing arrives pre-cut, nothing sits in a warming tray, and every bowl is finished to order behind the counter.",
+            "image": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1400&q=80",
+              "alt": "Rows of leafy green crops growing on a family farm at sunrise"
+            },
+            "stats": [
+              {
+                "value": "38",
+                "label": "Farm partners"
+              },
+              {
+                "value": "120 mi",
+                "label": "Average sourcing radius"
+              },
+              {
+                "value": "0",
+                "label": "Seed oils in our kitchens"
+              }
+            ],
+            "practices": [
+              {
+                "title": "Whole produce, prepped daily",
+                "description": "Vegetables arrive whole and are washed, cut and dressed in-house the same morning they are served."
+              },
+              {
+                "title": "Whole grains, cooked slow",
+                "description": "Farro, quinoa and brown rice simmer in small batches in every kitchen instead of arriving reheated."
+              },
+              {
+                "title": "Dressings made from scratch",
+                "description": "Every dressing and sauce is built on site with olive oil, fresh herbs and citrus pressed to order."
+              }
+            ]
+          }
+        },
+        {
+          "id": "reviews",
+          "type": "testimonials",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Guest Reviews",
+            "title": "Loved by the neighbourhood",
+            "description": "More than four hundred reviews across our three kitchens. Here is what regulars keep telling us.",
+            "items": [
+              {
+                "quote": "I eat here four days a week and I have never had the same bowl twice. The produce genuinely tastes like it was picked this week.",
+                "author": "Marissa L.",
+                "meta": "Union Market · Regular since 2019",
+                "rating": 5
+              },
+              {
+                "quote": "Fast enough for a workday lunch, good enough that I bring friends on the weekend. The grain bowls travel well too.",
+                "author": "Devon R.",
+                "meta": "Dupont Circle · Google review",
+                "rating": 5
+              },
+              {
+                "quote": "Finally a place where the vegetarian option is not an afterthought. The dressings are what keep me coming back.",
+                "author": "Priya S.",
+                "meta": "Bethesda Row · Yelp review",
+                "rating": 4
+              }
+            ]
+          }
+        },
+        {
+          "id": "order",
+          "type": "order-cta",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Order Ahead",
+            "title": "Skip the line. Pick up in fifteen.",
+            "description": "Order online for pickup at any of our three kitchens, or have it delivered through our partners across the District.",
+            "primaryAction": {
+              "label": "Order Now",
+              "target": {
+                "kind": "external",
+                "href": "https://order.toasttab.com/online/fern-and-grain"
+              }
+            },
+            "secondaryAction": {
+              "label": "Browse the menu",
+              "target": {
+                "kind": "page",
+                "pageId": "menu"
+              }
+            },
+            "image": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1518843875459-f738682238a6?auto=format&fit=crop&w=1200&q=80",
+              "alt": "Crates of freshly harvested vegetables at a farmers market"
+            }
+          }
+        },
+        {
+          "id": "locations",
+          "type": "locations",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Locations & Hours",
+            "title": "Three kitchens, one standard",
+            "description": "Walk in and order at the counter, or pick up on your way home. Every kitchen opens with the same overnight delivery from our farms.",
+            "pickupNote": "Order ahead and most bowls are bagged and waiting within about fifteen minutes.",
+            "stores": [
+              {
+                "name": "Union Market",
+                "addressLines": [
+                  "1309 5th Street NE",
+                  "Washington, DC 20002"
+                ],
+                "phone": "(202) 555-0142",
+                "hours": [
+                  {
+                    "days": "Monday – Friday",
+                    "time": "10:30am – 9:00pm"
+                  },
+                  {
+                    "days": "Saturday – Sunday",
+                    "time": "10:00am – 9:30pm"
+                  }
+                ],
+                "action": {
+                  "label": "Order from Union Market",
+                  "target": {
+                    "kind": "external",
+                    "href": "https://order.toasttab.com/online/fern-and-grain"
+                  }
+                }
+              },
+              {
+                "name": "Dupont Circle",
+                "addressLines": [
+                  "1527 Connecticut Avenue NW",
+                  "Washington, DC 20036"
+                ],
+                "phone": "(202) 555-0188",
+                "hours": [
+                  {
+                    "days": "Monday – Friday",
+                    "time": "10:30am – 9:30pm"
+                  },
+                  {
+                    "days": "Saturday – Sunday",
+                    "time": "10:30am – 9:00pm"
+                  }
+                ],
+                "action": {
+                  "label": "Order from Dupont Circle",
+                  "target": {
+                    "kind": "external",
+                    "href": "https://order.toasttab.com/online/fern-and-grain"
+                  }
+                }
+              },
+              {
+                "name": "Bethesda Row",
+                "addressLines": [
+                  "7112 Woodmont Avenue",
+                  "Bethesda, MD 20814"
+                ],
+                "phone": "(301) 555-0134",
+                "hours": [
+                  {
+                    "days": "Every day",
+                    "time": "11:00am – 8:30pm"
+                  }
+                ],
+                "action": {
+                  "label": "Order from Bethesda Row",
+                  "target": {
+                    "kind": "external",
+                    "href": "https://order.toasttab.com/online/fern-and-grain"
+                  }
+                }
+              }
+            ],
+            "map": {
+              "label": "Union Market flagship, Washington, DC",
+              "query": "Union Market, Washington, DC",
+              "note": "The flagship kitchen sits twelve minutes from Capitol Hill, with free pickup shelves at the door."
+            }
+          }
+        },
+        {
+          "id": "contact",
+          "type": "contact",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Contact",
+            "title": "Say hello to our team",
+            "description": "Catering, press, partnerships, or feedback on your last bowl — a person on our team reads every message.",
+            "channels": [
+              {
+                "label": "General enquiries",
+                "value": "hello@fernandgrain.com",
+                "href": "mailto:hello@fernandgrain.com",
+                "note": "Replies within one business day"
+              },
+              {
+                "label": "Catering",
+                "value": "catering@fernandgrain.com",
+                "href": "mailto:catering@fernandgrain.com",
+                "note": "Orders for ten guests or more"
+              },
+              {
+                "label": "Kitchen line",
+                "value": "(202) 555-0142",
+                "href": "tel:+12025550142",
+                "note": "Daily, 9:00am – 8:00pm"
+              }
+            ],
+            "form": {
+              "title": "Send us a note",
+              "description": "Tell us what you need and we will route it to the kitchen that can help.",
+              "nameLabel": "Your name",
+              "namePlaceholder": "Jordan Avery",
+              "emailLabel": "Email address",
+              "emailPlaceholder": "you@example.com",
+              "topicLabel": "Topic",
+              "topicPlaceholder": "Select a topic",
+              "topics": [
+                "General question",
+                "Catering",
+                "Careers",
+                "Press"
+              ],
+              "messageLabel": "How can we help?",
+              "messagePlaceholder": "Tell us a little about what you need and the best time to reach you.",
+              "submitLabel": "Send message",
+              "successMessage": "Thanks — your message is on its way. We reply within one business day.",
+              "privacyNote": "We use your details only to answer this message."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "menu",
+      "path": "/menu",
+      "metadata": {
+        "title": "Menu | Salads, Grain Bowls & Drinks | Fern & Grain",
+        "description": "Browse the full Fern & Grain menu: chopped salads, warm grain bowls, sides, cold-pressed drinks, desserts and limited-time seasonal plates, with prices and calories for every dish.",
+        "canonicalPath": "/menu",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "structuredData": {
+          "@context": "https://schema.org",
+          "@type": "Menu",
+          "name": "Fern & Grain Menu",
+          "url": "http://localhost:3000/menu",
+          "hasMenuSection": [
+            {
+              "@type": "MenuSection",
+              "name": "Salads"
+            },
+            {
+              "@type": "MenuSection",
+              "name": "Grain Bowls"
+            },
+            {
+              "@type": "MenuSection",
+              "name": "Sides"
+            },
+            {
+              "@type": "MenuSection",
+              "name": "Drinks"
+            },
+            {
+              "@type": "MenuSection",
+              "name": "Desserts"
+            },
+            {
+              "@type": "MenuSection",
+              "name": "Limited Time"
+            }
+          ]
+        }
+      },
+      "sections": [
+        {
+          "id": "menu-intro",
+          "type": "menu-intro",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Our Menu",
+            "title": "Built fresh, every single morning",
+            "description": "Six categories and one rule: if it is not in season, it is not on the board. Every price you see includes the whole bowl.",
+            "meta": [
+              "Board updates weekly",
+              "Nutrition available on request",
+              "Gluten-free swaps on every bowl"
+            ],
+            "image": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=2000&q=80",
+              "alt": "Overhead spread of fresh salads, grain bowls and side dishes"
+            }
+          }
+        },
+        {
+          "id": "menu-catalog",
+          "type": "menu-catalog",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Full Menu",
+            "title": "Every bowl, side and sip",
+            "description": "Filter by what you need today, sort the board, or jump straight to a category. Calories are listed for every bowl.",
+            "orderAction": {
+              "label": "Start an order",
+              "target": {
+                "kind": "external",
+                "href": "https://order.toasttab.com/online/fern-and-grain"
+              }
+            },
+            "allLabel": "All dishes",
+            "filterLabel": "Dietary filters",
+            "clearLabel": "Clear filters",
+            "sortLabel": "Sort by",
+            "resultLabel": "dishes",
+            "emptyMessage": "No dishes match those filters yet. Clear a filter or browse another category.",
+            "categories": [
+              {
+                "id": "salads",
+                "label": "Salads",
+                "blurb": "Chopped to order and dressed by hand."
+              },
+              {
+                "id": "grain-bowls",
+                "label": "Grain Bowls",
+                "blurb": "Warm grains, roasted vegetables and house sauces."
+              },
+              {
+                "id": "sides",
+                "label": "Sides",
+                "blurb": "Small plates that round out a bowl."
+              },
+              {
+                "id": "drinks",
+                "label": "Drinks",
+                "blurb": "Cold-pressed, brewed and blended in house."
+              },
+              {
+                "id": "desserts",
+                "label": "Desserts",
+                "blurb": "A little something sweet, made in small batches."
+              },
+              {
+                "id": "limited-time",
+                "label": "Limited Time",
+                "blurb": "Here for the season, gone when the fields are."
+              }
+            ],
+            "filters": [
+              {
+                "id": "vegetarian",
+                "label": "Vegetarian"
+              },
+              {
+                "id": "vegan",
+                "label": "Vegan"
+              },
+              {
+                "id": "gluten-free",
+                "label": "Gluten-Free"
+              },
+              {
+                "id": "high-protein",
+                "label": "High Protein"
+              }
+            ],
+            "sortOptions": [
+              {
+                "id": "featured",
+                "label": "Featured"
+              },
+              {
+                "id": "price-asc",
+                "label": "Price: Low to High"
+              },
+              {
+                "id": "price-desc",
+                "label": "Price: High to Low"
+              },
+              {
+                "id": "name-asc",
+                "label": "Name: A – Z"
+              }
+            ],
+            "items": [
+              {
+                "id": "harvest-crunch",
+                "name": "Harvest Crunch",
+                "description": "Chopped romaine, roasted sweet potato, apple, pepitas, aged cheddar and apple-cider vinaigrette.",
+                "price": 13.75,
+                "calories": 480,
+                "category": "salads",
+                "tags": [
+                  "vegetarian",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Chopped salad with roasted sweet potato and seeds in a shallow bowl"
+                }
+              },
+              {
+                "id": "green-goddess",
+                "name": "Green Goddess Bowl",
+                "description": "Little gem lettuce, cucumber, avocado, snap peas, soft herbs, green goddess dressing and sunflower seeds.",
+                "price": 14.25,
+                "calories": 520,
+                "category": "salads",
+                "tags": [
+                  "vegetarian",
+                  "vegan",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Green salad of lettuce, avocado and herbs on a white plate"
+                }
+              },
+              {
+                "id": "buffalo-chicken-crisp",
+                "name": "Buffalo Chicken Crisp",
+                "description": "Crisp romaine, grilled chicken, celery, carrot, blue cheese and yoghurt buffalo dressing.",
+                "price": 15.0,
+                "calories": 610,
+                "category": "salads",
+                "tags": [
+                  "high-protein",
+                  "gluten-free"
+                ],
+                "badge": "Guest Favorite",
+                "featured": true,
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Crisp chopped salad with grilled chicken and colourful vegetables"
+                }
+              },
+              {
+                "id": "herb-farro-chicken",
+                "name": "Herb Farro & Chicken",
+                "description": "Warm farro, grilled chicken, roasted zucchini, kale, lemon-herb dressing and shaved pecorino.",
+                "price": 15.5,
+                "calories": 640,
+                "category": "grain-bowls",
+                "tags": [
+                  "high-protein"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1521305916504-4a1121188589?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Warm grain bowl with farro, chicken and roasted vegetables"
+                }
+              },
+              {
+                "id": "miso-salmon",
+                "name": "Miso Salmon Bowl",
+                "description": "Brown rice, roasted salmon, edamame, pickled cucumber, sesame and miso-ginger glaze.",
+                "price": 17.25,
+                "calories": 700,
+                "category": "grain-bowls",
+                "tags": [
+                  "high-protein",
+                  "gluten-free"
+                ],
+                "badge": "Chef's Pick",
+                "featured": true,
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Roasted salmon fillet with rice and green vegetables"
+                }
+              },
+              {
+                "id": "golden-quinoa",
+                "name": "Golden Quinoa Bowl",
+                "description": "Turmeric quinoa, roasted cauliflower, chickpeas, currants, tahini and herb oil.",
+                "price": 14.5,
+                "calories": 560,
+                "category": "grain-bowls",
+                "tags": [
+                  "vegetarian",
+                  "vegan",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Quinoa bowl with roasted cauliflower and chickpeas"
+                }
+              },
+              {
+                "id": "charred-sweet-potato",
+                "name": "Charred Sweet Potato",
+                "description": "Fire-roasted sweet potato finished with chilli-lime salt and fresh coriander.",
+                "price": 5.5,
+                "calories": 210,
+                "category": "sides",
+                "tags": [
+                  "vegan",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Roasted sweet potato wedges with herbs on a plate"
+                }
+              },
+              {
+                "id": "warm-sourdough",
+                "name": "Warm Sourdough",
+                "description": "Country sourdough with cultured butter and flaked sea salt.",
+                "price": 4.25,
+                "calories": 180,
+                "category": "sides",
+                "tags": [
+                  "vegetarian"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Sliced sourdough bread with butter on a wooden board"
+                }
+              },
+              {
+                "id": "heirloom-tomato-soup",
+                "name": "Heirloom Tomato Soup",
+                "description": "Slow-simmered heirloom tomatoes with basil and cold-pressed olive oil.",
+                "price": 6.75,
+                "calories": 190,
+                "category": "sides",
+                "tags": [
+                  "vegetarian",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Bowl of tomato soup garnished with basil"
+                }
+              },
+              {
+                "id": "green-machine",
+                "name": "Green Machine Cold Press",
+                "description": "Cucumber, green apple, kale, lemon and ginger pressed to order.",
+                "price": 7.0,
+                "calories": 110,
+                "category": "drinks",
+                "tags": [
+                  "vegetarian",
+                  "vegan",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Green cold-pressed juice in a glass with fresh produce"
+                }
+              },
+              {
+                "id": "cold-brew",
+                "name": "Cold Brew, No Sugar",
+                "description": "Slow-steeped single-origin cold brew over ice.",
+                "price": 4.75,
+                "calories": 15,
+                "category": "drinks",
+                "tags": [
+                  "vegetarian",
+                  "vegan",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Glass of iced cold brew coffee on a light table"
+                }
+              },
+              {
+                "id": "citrus-mint-refresher",
+                "name": "Citrus Mint Refresher",
+                "description": "Grapefruit, orange, mint and sparkling water, lightly sweetened with honey.",
+                "price": 5.25,
+                "calories": 90,
+                "category": "drinks",
+                "tags": [
+                  "vegetarian",
+                  "gluten-free"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Citrus drink with mint served over ice in a tall glass"
+                }
+              },
+              {
+                "id": "olive-oil-cake",
+                "name": "Olive Oil Cake",
+                "description": "Citrus olive oil cake with whipped crème fraîche and macerated berries.",
+                "price": 7.5,
+                "calories": 340,
+                "category": "desserts",
+                "tags": [
+                  "vegetarian"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Slice of citrus cake with cream and fresh berries"
+                }
+              },
+              {
+                "id": "dark-chocolate-budino",
+                "name": "Dark Chocolate Budino",
+                "description": "Bittersweet chocolate pudding with olive oil and flaked sea salt.",
+                "price": 7.0,
+                "calories": 380,
+                "category": "desserts",
+                "tags": [
+                  "vegetarian"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Dark chocolate dessert served in a small glass"
+                }
+              },
+              {
+                "id": "summer-berry-crumble",
+                "name": "Summer Berry Crumble",
+                "description": "Roasted berries under an oat crumble with vanilla yoghurt.",
+                "price": 7.25,
+                "calories": 320,
+                "category": "desserts",
+                "tags": [
+                  "vegetarian"
+                ],
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1497534446932-c925b458314e?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Berry crumble served warm in a small dish"
+                }
+              },
+              {
+                "id": "charred-corn-avocado",
+                "name": "Charred Corn & Avocado Bowl",
+                "description": "Grilled sweet corn, avocado, pickled onion, cilantro-lime rice, cotija and jalapeño vinaigrette.",
+                "price": 14.5,
+                "calories": 590,
+                "category": "limited-time",
+                "tags": [
+                  "vegetarian",
+                  "gluten-free"
+                ],
+                "badge": "New This Season",
+                "featured": true,
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Charred corn and avocado salad bowl with fresh herbs"
+                }
+              },
+              {
+                "id": "stone-fruit-kale",
+                "name": "Stone Fruit & Kale",
+                "description": "Massaged kale, shaved fennel, ripe peaches, toasted almonds, pecorino and honey-lemon dressing.",
+                "price": 14.0,
+                "calories": 510,
+                "category": "limited-time",
+                "tags": [
+                  "vegetarian",
+                  "gluten-free"
+                ],
+                "badge": "Limited Time",
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1494390248081-4e521a5940db?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Green kale salad topped with sliced stone fruit and almonds"
+                }
+              },
+              {
+                "id": "heirloom-panzanella",
+                "name": "Heirloom Panzanella",
+                "description": "Heirloom tomatoes, torn sourdough, cucumber, basil, aged balsamic and cold-pressed olive oil.",
+                "price": 13.25,
+                "calories": 470,
+                "category": "limited-time",
+                "tags": [
+                  "vegetarian",
+                  "vegan"
+                ],
+                "badge": "Seasonal",
+                "image": {
+                  "kind": "image",
+                  "path": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80",
+                  "alt": "Heirloom tomato and bread salad served on a ceramic plate"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "order-menu",
+          "type": "order-cta",
+          "variant": "default",
+          "content": {
+            "eyebrow": "Ready When You Are",
+            "title": "Build your bowl, we will do the rest",
+            "description": "Every dish on this board can be ordered ahead for pickup at any kitchen, or delivered through our partners.",
+            "primaryAction": {
+              "label": "Order Now",
+              "target": {
+                "kind": "external",
+                "href": "https://order.toasttab.com/online/fern-and-grain"
+              }
+            },
+            "secondaryAction": {
+              "label": "See our kitchens",
+              "target": {
+                "kind": "page",
+                "pageId": "home",
+                "fragment": "locations"
+              }
+            },
+            "image": {
+              "kind": "image",
+              "path": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
+              "alt": "Fresh chopped salad bowl ready for takeaway"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

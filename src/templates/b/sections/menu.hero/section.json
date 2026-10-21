@@ -1,0 +1,21 @@
+{
+  "placement": "page",
+  "id": "menu.hero",
+  "type": "menu",
+  "variant": "hero",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Menu Page Header",
+    "description": "Menu page opener with an eyebrow, the page headline, a description, and a row of highlight pills; it owns the menu page h1.",
+    "useWhen": [
+      "The menu page needs its single h1 and a short introduction above the catalog",
+      "A few scan-friendly highlights should sit under the menu headline"
+    ],
+    "avoidWhen": [
+      "The page already has an opener or h1",
+      "The menu page needs filtering or sorting rather than an introduction"
+    ],
+    "rendering": "server"
+  }
+}

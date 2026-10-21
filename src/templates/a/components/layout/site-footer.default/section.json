@@ -1,0 +1,15 @@
+{
+  "placement": "layout.footer",
+  "id": "site-footer.default",
+  "type": "site-footer",
+  "variant": "default",
+  "contract": "./contract.schema.json",
+  "definition": "./definition.tsx",
+  "capability": {
+    "title": "Site Footer",
+    "description": "Site-wide footer with the brand blurb and order action, grouped navigation, kitchen addresses, opening hours, social links, a newsletter sign-up form and legal links. Renders once from layout.footer, so its column labels stay non-heading text and only the newsletter block carries an h2.",
+    "useWhen": ["Every page needs shared store details, opening hours, navigation and a mailing-list sign-up"],
+    "avoidWhen": ["A page needs a local contact or locations content block inside its own body content"],
+    "rendering": "server"
+  }
+}
