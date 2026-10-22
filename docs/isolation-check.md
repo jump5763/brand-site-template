@@ -47,7 +47,7 @@
 - 独立启动 a1、b1 部署包后，所选商家 200，同模板另一商家 404；全量服务四商家的首页和菜单均为 200。
 - `node scripts/inspect-build.mjs <a1|b1|all>`：检查产物与追踪，完整结果在 `output/audit/`。
 - `output/playwright/<商家>-home.txt`、`<商家>-menu.txt`：浏览器实际请求记录。
-- `node scripts/check-browser-resources.mjs`：复核上述请求与模块归属，结果为 `output/audit/browser.json`。
+- 当时的浏览器请求与模块归属检查结果保留在 `output/audit/browser.json`；专用离线浏览器审计入口现已移除，后续直接进行浏览器验收。
 
 原模板未提供 favicon，浏览器仍可能记录该地址的 404；远程图片与地图可能出现网络或预加载警告。本次未改变这些模板资源。未发现跨模板加载或站内导航错误。
 

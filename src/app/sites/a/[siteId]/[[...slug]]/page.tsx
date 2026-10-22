@@ -5,6 +5,7 @@ import { pageParams, pageMetadata, pagePath, renderContent, type SitePageProps }
 export const dynamic = "error";
 export const dynamicParams = false;
 export async function generateStaticParams({ params }: { params: { siteId: string } }) {
+  if (!params.siteId) return [];
   return pageParams(await loadSite(params.siteId));
 }
 export async function generateMetadata({ params }: SitePageProps) {

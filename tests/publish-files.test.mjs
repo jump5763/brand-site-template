@@ -1,0 +1,37 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mkdtemp, rm, readFile, access, copyFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { publishFiles } from "../scripts/publish-files.mjs";
+import { seedArtifacts, put } from "./helpers/artifacts.mjs";
+
+test("publication selects complete tenant responses, orders writes and preserves old static", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "publish-test-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const nextDir = path.join(root, "next");
+  const artifactDir = path.join(root, "artifacts");
+  await seedArtifacts(nextDir);
+  await seedArtifacts(nextDir, { id: "a10" });
+  await put(nextDir, "server/app/sites/a/a1/page.js", "server-only");
+  await put(artifactDir, "_next/static/old.js", "keep");
+  const writes = [];
+  const options = { nextDir, artifactDir, sites: [{ id: "a1", templateId: "a" }] };
+  await assert.rejects(publishFiles({ ...options, sites: [{ id: "a1", templateId: "unknown" }], copy: async (_source, target) => { writes.push(target); } }), /Invalid publication target/);
+  assert.deepEqual(writes, []);
+  const result = await publishFiles({ ...options, copy: async (source, target) => { writes.push(target); await copyFile(source, target); } });
+  assert.equal(result.responses, 4);
+  assert.equal(await readFile(path.join(artifactDir, "_next/server/app/sites/a/a1.segments/_tree.segment.rsc"), "utf8"), "/_tree:old");
+  await access(path.join(artifactDir, "_next/static/old.js"));
+  await assert.rejects(access(path.join(artifactDir, "_next/server/app/sites/a/a10.html")), { code: "ENOENT" });
+  await assert.rejects(access(path.join(artifactDir, "_next/server/app/sites/a/a1/page.js")), { code: "ENOENT" });
+  const firstResponse = writes.findIndex((file) => file.includes("/server/app/"));
+  assert.ok(writes.slice(0, firstResponse).every((file) => file.includes("/static/")));
+  const firstMarker = writes.findIndex((file) => /\.(html|body)$/.test(file));
+  assert.ok(writes.slice(firstMarker).every((file) => /\.(html|body)$/.test(file)));
+  let count = 0;
+  await assert.rejects(publishFiles({ ...options, copy: async (source, target) => { if (++count === 4) throw new Error("injected disk error"); await copyFile(source, target); } }), /Upload failed.*injected disk error/);
+  await publishFiles(options);
+  await rm(path.join(nextDir, "server/app/sites/a/a1.segments/_tree.segment.rsc"));
+  await assert.rejects(publishFiles(options), /Missing segment/);
+});

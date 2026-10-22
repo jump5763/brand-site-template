@@ -1,4 +1,5 @@
 import catalog from "./site-catalog.json" with { type: "json" };
+import templateIds from "./template-ids.json" with { type: "json" };
 
 export const sites = catalog;
 
@@ -16,7 +17,7 @@ export function selectSites(scope = "all") {
 }
 
 export function getBuildSites() {
-  return selectSites(process.env.BRAND_SITE_BUILD_SCOPE || "all");
+  return selectSites(process.env.BRAND_SITE_PRERENDER_SCOPE || "all");
 }
 
 /** @param {string} templateId */
@@ -39,7 +40,8 @@ export function findSiteByHost(host) {
  * @param {string} pathname
  */
 export function publicPathname(pathname) {
-  return pathname.replace(/^\/sites\/[ab]\/[^/]+(?=\/|$)/, "") || "/";
+  const match = pathname.match(/^\/sites\/([^/]+)\/[^/]+(?=\/|$)/);
+  return (match && templateIds.includes(match[1]) ? pathname.slice(match[0].length) : pathname) || "/";
 }
 
 /** @param {string} host @param {string} pathname @param {string} [scope] */

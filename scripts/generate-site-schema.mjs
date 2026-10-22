@@ -5,6 +5,7 @@ import path from "node:path";
 import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { compile } from "json-schema-to-typescript";
+import templateIds from "../src/template-ids.json" with { type: "json" };
 
 const args = process.argv.slice(2);
 const check = args.includes("--check");
@@ -67,7 +68,7 @@ function embed(value, prefix) {
 async function main() {
   const projectRoot = path.resolve(option("--root", process.cwd()));
   const templateId = option("--template", "");
-  if (!["a", "b"].includes(templateId)) throw new Error("Use --template a or --template b");
+  if (!templateIds.includes(templateId)) throw new Error(`Use ${templateIds.map((id) => `--template ${id}`).join(" or ")}`);
   const root = path.join(projectRoot, "src/templates", templateId);
   const sectionsRoot = path.resolve(option("--sections", path.join(root, "sections")));
   const output = path.resolve(option("--out", path.join(root, "site-schema/generated")));

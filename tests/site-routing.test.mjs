@@ -5,7 +5,7 @@ import { findSite, findSiteByHost, publicPathname, resolveSiteRequest, selectSit
 import { validateSiteDocument as validateA } from "../src/templates/a/site-schema/runtime/validator.mjs";
 import { validateSiteDocument as validateB } from "../src/templates/b/site-schema/runtime/validator.mjs";
 import { prepareWorkspace } from "../scripts/prepare.mjs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 
@@ -37,8 +37,13 @@ test("a merchant build is not a template-wide build", () => {
 });
 
 test("public navigation strips both template and merchant segments", () => {
+  assert.equal(publicPathname(""), "/");
   assert.equal(publicPathname("/sites/a/a1/menu"), "/menu");
   assert.equal(publicPathname("/sites/b/b2"), "/");
+  assert.equal(publicPathname("/sites/b/b2/"), "/");
+  assert.equal(publicPathname("/sites/unknown/u1/menu"), "/sites/unknown/u1/menu");
+  assert.equal(publicPathname("/sites/ab/a1/menu"), "/sites/ab/a1/menu");
+  assert.equal(publicPathname("/sites/a"), "/sites/a");
   assert.equal(publicPathname("/menu"), "/menu");
 });
 
@@ -61,7 +66,10 @@ test("clean preparation excludes other merchant data, template code and old outp
     }
     const catalog = JSON.parse(await readFile(`${work}/src/site-catalog.json`, "utf8"));
     assert.deepEqual(catalog.map((site) => site.id), ["a1"]);
-    assert.match(await readFile(`${work}/src/site-data.ts`, "utf8"), /sites\/a1\/current.json/);
-    assert.doesNotMatch(await readFile(`${work}/src/site-data.ts`, "utf8"), /a2|b1|b2/);
+    const routing = await import(pathToFileURL(`${work}/src/site-routing.mjs`).href);
+    assert.equal(routing.publicPathname("/sites/a/a1/menu"), "/menu");
+    assert.equal(routing.resolveSiteRequest("a1.localhost", "/menu").pathname, "/sites/a/a1/menu");
+    assert.equal(JSON.parse(await readFile(`${work}/sites/a1/current.json`, "utf8")).siteId, "a1");
+    await assert.rejects(access(`${work}/src/site-data.ts`), { code: "ENOENT" });
   } finally { await rm(work, { recursive: true, force: true }); }
 });

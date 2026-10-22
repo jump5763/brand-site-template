@@ -14,7 +14,11 @@
     "validate:site": "node scripts/sites.mjs validate",
     "typecheck": "node scripts/sites.mjs typecheck",
     "lint": "eslint .",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "publish": "node scripts/sites.mjs publish",
+    "upload": "node scripts/sites.mjs upload",
+    "local:services": "node scripts/local-services.mjs",
+    "builder": "node scripts/builder.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.0.1",
