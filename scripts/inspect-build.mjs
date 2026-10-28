@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile, lstat, writeFile, mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { selectSites, sites } from "../src/site-routing.mjs";
+import { selectSites, sites } from "./sample-sites.mjs";
 import templateIds from "../src/template-ids.json" with { type: "json" };
 import { checkResourceOwnership, evidenceSummary, filesAt, readBuildEvidence, resourceLocation } from "./resource-audit.mjs";
 
@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 export async function inspectBuild(options) {
   const { scope = "all", appDir: dir, artifactDir, assetPrefix, traceDir } = options;
   let catalog;
-  try { catalog = JSON.parse(await readFile(path.join(dir, "site-catalog.json"), "utf8")); }
+  try { catalog = JSON.parse(await readFile(path.join(dir, "build-input/sites.json"), "utf8")); }
   catch (error) { if (error.code !== "ENOENT") throw error; catalog = selectSites(scope); }
   const selected = scope === "all" ? catalog : catalog.filter((site) => site.id === scope);
   assert.ok(selected.length, `No sites in application for scope: ${scope}`);

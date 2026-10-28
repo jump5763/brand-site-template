@@ -32,14 +32,14 @@ test("API snapshot stays fixed, validates identities and retains full code for s
   const work = await prepareWorkspace(process.cwd(), [catalog[0]], { catalog, documents: docs, completeTemplates: true });
   t.after(() => rm(work, { recursive: true, force: true }));
   assert.equal(JSON.parse(await readFile(path.join(work, "sites/a1/current.json"), "utf8")).pages[0].metadata.title, originalTitle);
-  assert.equal(JSON.parse(await readFile(path.join(work, "src/site-catalog.json"), "utf8")).length, 4);
+  assert.equal(JSON.parse(await readFile(path.join(work, "build-input/sites.json"), "utf8")).length, 1);
   await access(path.join(work, "src/app/sites/b/[siteId]/layout.tsx"));
   await assert.rejects(access(path.join(work, "sites/a2")), { code: "ENOENT" });
   assert.equal(requests.filter(([, url]) => url === "/sites/a1/content").length, 1);
   changed.siteId = "a2";
   await writeFile(path.join(root, "a1.json"), JSON.stringify(changed));
   await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), /identity mismatch/);
-  await writeFile(path.join(root, "a1.json"), "{}");
+  await writeFile(path.join(root, "a1.json"), JSON.stringify({ siteId: "a1", siteUrl: catalog[0].siteUrl }));
   await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), /Schema/);
   assert.equal((await fetch(`${base}/sites/nope/content`, { headers: { Authorization: "Bearer test-only" } })).status, 404);
   for (const entry of [

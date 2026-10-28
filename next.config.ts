@@ -1,7 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
-import catalog from "./src/site-catalog.json";
 
 const config = (phase: string): NextConfig => ({
   output: "standalone",
@@ -15,7 +14,9 @@ const config = (phase: string): NextConfig => ({
   env: {
     SEARCH_INDEXING_ENABLED: process.env.SEARCH_INDEXING_ENABLED || "false",
   },
-  allowedDevOrigins: [...catalog.map((site) => site.hostname), "127.0.0.1"],
+  ...(phase === PHASE_DEVELOPMENT_SERVER ? {
+    allowedDevOrigins: [...(process.env.BRAND_SITE_DEV_ORIGINS || "").split(",").filter(Boolean), "127.0.0.1"],
+  } : {}),
 });
 
 export default config;

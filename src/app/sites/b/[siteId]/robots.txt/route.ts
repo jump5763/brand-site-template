@@ -1,9 +1,9 @@
 import { loadSite } from "@/templates/b/site";
-import { sitesForTemplate } from "@/site-routing.mjs";
+import { sitesForTemplate } from "@/server/build-input.mjs";
 import { robotsResponse } from "@/shared/site-pages";
 
 export const dynamic = "force-static";
-export const dynamicParams = false;
+export const dynamicParams = true;
 export function generateStaticParams() {
   return sitesForTemplate("b").map((site) => ({ siteId: site.id }));
 }

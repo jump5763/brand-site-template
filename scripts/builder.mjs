@@ -3,14 +3,14 @@ import { spawn } from "node:child_process";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readDeployedCatalog } from "./content-input.mjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const maxBodyBytes = 16 * 1024;
 
 export function createPublishRunner({ appDir, projectDir = projectRoot, env = process.env }) {
   return (task) => new Promise((resolve, reject) => {
-    const args = task.scope === "all" ? ["--all"] : ["--site", task.siteId];
+    const args = task.scope === "all" ? ["--all"]
+      : task.scope === "template" ? ["--template", task.templateId] : ["--site", task.siteId];
     // Do not forward Builder shutdown signals: accepted publications must finish.
     const child = spawn(process.execPath, [path.join(projectDir, "scripts/sites.mjs"), "publish", ...args], {
       cwd: projectDir, env: { ...env, APP_DIR: appDir }, stdio: "inherit",
@@ -27,14 +27,17 @@ function parseTask(text) {
   const value = JSON.parse(text);
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected a JSON object");
   const keys = Object.keys(value);
+  const idField = value.scope === "template" ? "templateId" : "siteId";
   const valid = value.scope === "all"
     ? keys.length === 1
-    : value.scope === "site" && keys.length === 2 && typeof value.siteId === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(value.siteId);
-  if (!valid) throw new Error('Expected { scope: "site", siteId } or { scope: "all" }');
+    : ["site", "template"].includes(value.scope) && keys.length === 2 && typeof value[idField] === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(value[idField]);
+  if (!valid) throw new Error('Expected { scope: "all" }, { scope: "template", templateId } or { scope: "site", siteId }');
   // Valid requests contain only string fields; reject duplicate keys lost by JSON.parse.
   if ((text.match(/"(?:[^"\\]|\\.)*"\s*:/g) || []).length !== keys.length) throw new Error("Duplicate JSON fields");
-  return value.scope === "all" ? { scope: "all" } : { scope: "site", siteId: value.siteId };
+  return value.scope === "all" ? { scope: "all" } : { scope: value.scope, [idField]: value[idField] };
 }
+
+const scopeLabel = (task) => task.scope === "all" ? "all" : `${task.scope}:${task.templateId ?? task.siteId}`;
 
 async function readTask(request) {
   let size = 0;
@@ -57,9 +60,8 @@ function json(response, status, value) {
 }
 
 export async function createBuilder({ appDir = process.env.APP_DIR, runner, logger = console } = {}) {
-  const catalog = await readDeployedCatalog(appDir);
+  if (typeof appDir !== "string" || !appDir.trim()) throw new Error("APP_DIR is required for Builder");
   appDir = path.resolve(appDir);
-  const siteIds = new Set(catalog.map((site) => site.id));
   runner ||= createPublishRunner({ appDir });
   const queue = [];
   let accepting = true;
@@ -71,7 +73,7 @@ export async function createBuilder({ appDir = process.env.APP_DIR, runner, logg
     if (running) return;
     while (queue.length) {
       const task = queue.shift();
-      const scope = task.scope === "all" ? "all" : `site:${task.siteId}`;
+      const scope = scopeLabel(task);
       running = true;
       let result = "success";
       logger.log(`Builder begin: ${scope}; publish`);
@@ -112,10 +114,8 @@ export async function createBuilder({ appDir = process.env.APP_DIR, runner, logg
     }
     // Shutdown may begin while this request is still receiving its body.
     if (!accepting) return unavailable();
-    if (task.scope === "site" && !siteIds.has(task.siteId)) {
-      return json(response, 404, { accepted: false, error: "Unknown deployed site" });
-    }
     queue.push(task);
+    logger.log(`Builder accepted: ${scopeLabel(task)}; queued`);
     json(response, 202, { accepted: true });
     void runQueue();
   });

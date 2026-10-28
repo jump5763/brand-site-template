@@ -20,7 +20,7 @@ async function fixture(t) {
   await Promise.all([
     save(path.join(options.appDir, ".next", pageKey), "{101:()=>{}}"),
     save(path.join(options.appDir, ".next/static/css/a.css"), ".a{color:red}"),
-    save(path.join(options.appDir, "site-catalog.json"), JSON.stringify([{ id: "a1", templateId: "a" }, { id: "a2", templateId: "a" }])),
+    save(path.join(options.appDir, "build-input/sites.json"), JSON.stringify([{ id: "a1", templateId: "a" }, { id: "a2", templateId: "a" }])),
     save(manifestFile, `globalThis.manifest=${JSON.stringify(manifest)};`),
     save(path.join(options.traceDir, "server/app/page.js.nft.json"), JSON.stringify({ files: [] })),
   ]);

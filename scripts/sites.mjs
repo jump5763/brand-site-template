@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { cp, mkdir, rm, rename, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { selectSites } from "../src/site-routing.mjs";
+import templateIds from "../src/template-ids.json" with { type: "json" };
 import { prepareWorkspace } from "./prepare.mjs";
-import { readApiCatalog, readApiDocuments, readDeployedCatalog, readLocalDocuments } from "./content-input.mjs";
-import { readDeployedBaseline, selectDeployedSites, validateDeployedScope } from "./deployed-scope.mjs";
+import { readApiCatalog, readApiDocuments, readBuildCatalog, readLocalDocuments, normalizeScope, scopeLabel, selectCatalogScope } from "./content-input.mjs";
+import { readDeployedBaseline, validateDeployedCapabilities } from "./deployed-scope.mjs";
 import { assertSafeAuditOutput, assertSafeBuildOutput } from "./output-paths.mjs";
+import { publishFiles } from "./publish-files.mjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 
@@ -30,176 +32,255 @@ export function run(command, args, cwd, env = process.env) {
   });
 }
 
-function parseArgs(args) {
+export function parseArgs(args) {
+  args = [...args];
   const mode = args.shift();
   if (!["build", "dev", "start", "publish", "upload", "typecheck", "validate", "schema:generate", "schema:check"].includes(mode)) throw new Error("Unknown command");
-  let scope = "all";
+  let scope = { scope: "all" };
   let explicit = false;
   let output;
   const extra = [];
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === "--") continue;
-    if (arg === "--all" || arg === "--site" || arg.startsWith("--site=")) {
-      if (explicit) throw new Error("Choose one --site or --all");
+    const option = /^(--site|--template)(?:=(.*))?$/.exec(arg);
+    if (arg === "--all" || option) {
+      if (explicit) throw new Error("Choose exactly one --all, --template or --site");
       explicit = true;
-      scope = arg === "--all" ? "all" : arg === "--site" ? args[++index] : arg.slice(7);
-      if (!scope) throw new Error("--site requires a merchant ID");
+      if (arg === "--all") scope = { scope: "all" };
+      else {
+        const value = option[2] === undefined ? args[++index] : option[2];
+        scope = option[1] === "--site" ? { scope: "site", siteId: value } : { scope: "template", templateId: value };
+      }
     } else if (arg === "--output" && mode === "build") {
+      if (output) throw new Error("Choose one --output");
       output = args[++index];
-      if (!output) throw new Error("--output requires a directory");
+      if (!output || output.startsWith("--")) throw new Error("--output requires a directory");
     } else {
       if (!["dev", "start"].includes(mode)) throw new Error(`Unknown argument: ${arg}`);
       extra.push(arg);
     }
   }
-  return { mode, scope, extra, output: path.resolve(projectRoot, output || `dist/${scope}`) };
+  scope = normalizeScope(scope);
+  return { mode, scope, extra, output: path.resolve(projectRoot, output || `dist/${scopeLabel(scope)}`) };
 }
 
-export async function main(args = process.argv.slice(2)) {
-  const { mode, scope, extra, output: requestedOutput } = parseArgs(args);
-  let output = requestedOutput;
-  const apiUrl = process.env.CONTENT_API_URL;
-  const token = process.env.CONTENT_API_TOKEN;
-  const appDir = process.env.APP_DIR && path.resolve(process.env.APP_DIR);
-  if (mode === "build") output = await assertSafeBuildOutput({ projectRoot, output, artifactDir: process.env.ARTIFACT_DIR, appDir });
-  let auditDir;
-  if (mode === "build" || (mode === "publish" && process.env.PUBLISH_AUDIT_DIR)) {
-    const requestedAudit = mode === "publish" ? path.resolve(process.env.PUBLISH_AUDIT_DIR, scope) : path.join(projectRoot, "output/traces", scope);
-    auditDir = await assertSafeAuditOutput({ projectRoot, output: requestedAudit, artifactDir: process.env.ARTIFACT_DIR, appDir });
-  }
-  if (mode.startsWith("schema:")) {
-    for (const template of new Set(selectSites(scope).map((site) => site.templateId))) {
-      await run(process.execPath, ["scripts/generate-site-schema.mjs", "--template", template, ...(mode === "schema:check" ? ["--check"] : [])], projectRoot);
+function buildEnvironment(env, buildEnv = {}) {
+  const result = { ...env, ...buildEnv, NODE_ENV: "production", BRAND_SITE_BUILDING: "1" };
+  for (const name of ["CONTENT_API_TOKEN", "CONTENT_API_URL", "ARTIFACT_BASE_URL", "BRAND_SITE_BUILD_INPUT_ROOT", "BRAND_SITE_PRERENDER_SCOPE"]) delete result[name];
+  return result;
+}
+
+async function compileWorkspace(work, env, runner, mode = "build") {
+  await runner("corepack", ["pnpm", "install", "--frozen-lockfile", "--offline", "--reporter=silent"], work, { ...env, CI: "true", NODE_ENV: "development" });
+  const next = path.join(work, "node_modules/next/dist/bin/next");
+  if (mode === "typecheck") {
+    await runner(process.execPath, [next, "typegen"], work, env);
+    await runner(process.execPath, [path.join(work, "node_modules/typescript/bin/tsc"), "--noEmit"], work, env);
+  } else await runner(process.execPath, [next, "build", "--webpack"], work, env);
+}
+
+async function saveAudit(work, auditDir) {
+  await rm(auditDir, { recursive: true, force: true });
+  await cp(path.join(work, ".next"), auditDir, { recursive: true, filter: async (source) => {
+    const relative = path.relative(path.join(work, ".next"), source);
+    if (relative.split(path.sep).some((part) => ["standalone", "cache", "static"].includes(part))) return false;
+    return (await stat(source)).isDirectory() || /(?:\.nft\.json|prerender-manifest\.json|client-reference-manifest\.js)$/.test(source);
+  } });
+}
+
+/** One invocation covers current API input, one build, upload and cleanup. */
+export async function publishScope(requestedScope, {
+  env = process.env, runner = run, prepare = prepareWorkspace, publish = publishFiles, cleanup = rm,
+} = {}) {
+  const scope = normalizeScope(requestedScope);
+  const label = scopeLabel(scope);
+  let work;
+  let result;
+  let failure;
+  let stage = "input validation";
+  console.log(`Publish start: ${label}; reading API`);
+  try {
+    if (!env.CONTENT_API_URL) throw new Error("CONTENT_API_URL is required for publish");
+    const artifactDir = requiredArtifactDir(env);
+    const appDir = env.APP_DIR && path.resolve(env.APP_DIR);
+    const [baseline, selected] = await Promise.all([
+      readDeployedBaseline(appDir), readApiCatalog(env.CONTENT_API_URL, env.CONTENT_API_TOKEN, scope),
+    ]);
+    const buildEnv = validateDeployedCapabilities({ baseline, selected, scope, env });
+    if (!selected.length) {
+      result = { status: "skipped", siteIds: [] };
+    } else {
+      const auditDir = env.PUBLISH_AUDIT_DIR ? await assertSafeAuditOutput({ projectRoot,
+        output: path.resolve(env.PUBLISH_AUDIT_DIR, label), artifactDir, appDir }) : null;
+      const documents = await readApiDocuments(env.CONTENT_API_URL, selected, env.CONTENT_API_TOKEN);
+      stage = "prepare";
+      work = await prepare(projectRoot, selected, { catalog: selected, documents, completeTemplates: true });
+      console.log(`publish: ${label}; clean workspace: ${work}`);
+      stage = "build";
+      await compileWorkspace(work, buildEnvironment(env, buildEnv), runner);
+      console.log(`Build complete: ${label}`);
+      stage = "upload";
+      await publish({ nextDir: path.join(work, ".next"), artifactDir, sites: selected });
+      console.log(`Upload complete: ${label}`);
+      if (auditDir) { stage = "audit"; await saveAudit(work, auditDir); }
+      result = { status: "published", siteIds: selected.map((site) => site.id) };
     }
+  } catch (error) {
+    failure = new Error(`publish ${label} failed during ${stage}: ${error.message}`, { cause: error });
+  } finally {
+    if (work) {
+      try {
+        await cleanup(work, { recursive: true, force: true });
+        console.log(`Cleanup complete: ${label}`);
+      } catch (error) {
+        const cleanupFailure = new Error(`publish ${label} failed during cleanup: ${error.message}`, { cause: error });
+        failure = failure ? new AggregateError([failure, cleanupFailure], `${failure.message}; ${cleanupFailure.message}`) : cleanupFailure;
+      }
+    }
+  }
+  if (failure) throw failure;
+  console.log(result.status === "skipped" ? `Publish skipped: ${label}; no targets` : `Publish complete: ${label}`);
+  return result;
+}
+
+async function sampleTargets(scope) {
+  const { selectSites } = await import("./sample-sites.mjs");
+  const selected = selectCatalogScope(selectSites(), scope);
+  if (!selected.length) throw new Error(`No sample targets: ${scopeLabel(scope)}`);
+  return selected;
+}
+
+export async function main(args = process.argv.slice(2), dependencies = {}) {
+  const { mode, scope, extra, output: requestedOutput } = parseArgs(args);
+  if (mode === "publish") return publishScope(scope, dependencies);
+  const env = dependencies.env || process.env;
+  const runner = dependencies.runner || run;
+  const label = scopeLabel(scope);
+  const apiUrl = env.CONTENT_API_URL;
+  const token = env.CONTENT_API_TOKEN;
+  const appDir = env.APP_DIR && path.resolve(env.APP_DIR);
+  if (mode.startsWith("schema:")) {
+    const templates = scope.scope === "all" ? templateIds : scope.scope === "template" ? [scope.templateId]
+      : [...new Set((await sampleTargets(scope)).map((site) => site.templateId))];
+    if (templates.some((template) => !templateIds.includes(template))) throw new Error("Unknown template");
+    for (const template of templates) await runner(process.execPath, ["scripts/generate-site-schema.mjs", "--template", template, ...(mode === "schema:check" ? ["--check"] : [])], projectRoot, env);
     return;
   }
   if (mode === "start") {
-    const env = { ...process.env, NODE_ENV: "production", BRAND_SITE_BUILDING: "0" };
-    if (scope !== "all") delete env.ARTIFACT_BASE_URL;
+    const runtimeEnv = { ...env, NODE_ENV: "production", BRAND_SITE_BUILDING: "0" };
+    if (scope.scope !== "all") delete runtimeEnv.ARTIFACT_BASE_URL;
     for (let index = 0; index < extra.length; index++) {
       const flag = extra[index];
       const value = extra[++index];
       if (!value) throw new Error(`${flag} requires a value`);
-      if (["--port", "-p"].includes(flag)) env.PORT = value;
-      else if (["--hostname", "-H"].includes(flag)) env.HOSTNAME = value;
+      if (["--port", "-p"].includes(flag)) runtimeEnv.PORT = value;
+      else if (["--hostname", "-H"].includes(flag)) runtimeEnv.HOSTNAME = value;
       else throw new Error(`Unknown argument: ${flag}`);
     }
-    await run(process.execPath, ["server.js"], appDir || output, env);
+    const fixture = !apiUrl && !appDir && scope.scope === "site" ? await startSampleApi(scope, Number(runtimeEnv.PORT || 3000), token) : null;
+    if (fixture) runtimeEnv.CONTENT_API_URL = fixture.url;
+    try { await runner(process.execPath, ["server.js"], appDir || requestedOutput, runtimeEnv); }
+    finally { if (fixture) await fixture.close(); }
     return;
   }
   if (mode === "upload") {
-    const catalog = await readDeployedCatalog(appDir);
-    const selected = scope === "all" ? catalog : catalog.filter((site) => site.id === scope);
-    if (!selected.length) throw new Error(`Unknown deployed site: ${scope}`);
-    const { publishFiles } = await import("./publish-files.mjs");
-    await publishFiles({ nextDir: path.join(appDir, ".next"), artifactDir: requiredArtifactDir(), sites: selected });
-    console.log(`Upload complete: ${scope}`);
-    return;
-  }
-  let catalog;
-  let selected;
-  let documents;
-  let buildEnv = {};
-  if (mode === "publish") {
-    if (!apiUrl) throw new Error("CONTENT_API_URL is required for publish");
-    requiredArtifactDir();
-    console.log(`Publish start: ${scope}; reading API`);
-    try {
-      const [baseline, candidateCatalog] = await Promise.all([readDeployedBaseline(appDir), readApiCatalog(apiUrl, token)]);
-      const selection = selectDeployedSites({ baseline, catalog: candidateCatalog, scope });
-      catalog = baseline.catalog;
-      selected = selection.selected;
-      if (selection.ignoredSites.length) console.log(`Undeployed sites ignored; application deployment required: ${selection.ignoredSites.map((site) => site.id).join(", ")}`);
-      buildEnv = baseline.buildEnv;
-      for (const [name, value] of Object.entries(buildEnv)) {
-        if (process.env[name] !== undefined && process.env[name] !== value) throw new Error(`${name} differs from deployed application; application deployment required`);
-      }
-      documents = await readApiDocuments(apiUrl, selected, token);
-      validateDeployedScope({ baseline, selection, documents });
-    } catch (error) {
-      throw new Error(`publish ${scope} failed during input validation: ${error.message}`, { cause: error });
-    }
-  } else if (mode === "build" && (scope === "all" || apiUrl)) {
-    catalog = await readApiCatalog(apiUrl, token);
-    selected = scope === "all" ? catalog : catalog.filter((site) => site.id === scope);
-    if (!selected.length) throw new Error(`Unknown site: ${scope}`);
-    documents = await readApiDocuments(apiUrl, selected, token);
-    if (scope !== "all") catalog = selected;
-  } else {
-    selected = selectSites(scope);
-    catalog = selected;
-    documents = await readLocalDocuments(projectRoot, selected);
-  }
-  if (mode === "validate") {
-    console.log(`Valid: ${selected.map((site) => site.id).join(", ")}`);
+    const selected = selectCatalogScope(await readBuildCatalog(appDir), scope);
+    if (!selected.length) { console.log(`Upload skipped: ${label}; no built targets`); return; }
+    await publishFiles({ nextDir: path.join(appDir, ".next"), artifactDir: requiredArtifactDir(env), sites: selected });
+    console.log(`Upload complete: ${label}`);
     return;
   }
   if (mode === "dev") {
-    await run(process.execPath, [path.join(projectRoot, "node_modules/next/dist/bin/next"), "dev", "--webpack", ...extra], projectRoot,
-      { ...process.env, NODE_ENV: "development", BRAND_SITE_PRERENDER_SCOPE: scope });
+    const portIndex = extra.findIndex((value) => value === "--port" || value === "-p");
+    const fixture = !apiUrl ? await startSampleApi(scope, Number(portIndex >= 0 ? extra[portIndex + 1] : 3000), token) : null;
+    let input;
+    try {
+      input = await mkdtemp(path.join(os.tmpdir(), "brand-site-dev-input-"));
+      const targets = await readApiCatalog(apiUrl || fixture.url, token, scope);
+      if (!targets.length) throw new Error(`No targets: ${label}`);
+      await mkdir(path.join(input, "build-input"));
+      await writeFile(path.join(input, "build-input/sites.json"), JSON.stringify(targets));
+      await runner(process.execPath, [path.join(projectRoot, "node_modules/next/dist/bin/next"), "dev", "--webpack", ...extra], projectRoot,
+        { ...env, NODE_ENV: "development", BRAND_SITE_BUILDING: "0", CONTENT_API_URL: apiUrl || fixture.url,
+          BRAND_SITE_BUILD_INPUT_ROOT: input, BRAND_SITE_DEV_ORIGINS: targets.map((site) => site.hostname).join(",") });
+    } finally {
+      await Promise.all([fixture?.close(), input ? rm(input, { recursive: true, force: true }) : undefined]);
+    }
     return;
   }
-  const work = await prepareWorkspace(projectRoot, selected, { catalog, documents, completeTemplates: mode === "publish" || scope === "all" });
+  let output = requestedOutput;
+  let auditDir;
+  if (mode === "build") {
+    output = await assertSafeBuildOutput({ projectRoot, output, artifactDir: env.ARTIFACT_DIR, appDir });
+    auditDir = await assertSafeAuditOutput({ projectRoot, output: path.resolve(env.BUILD_AUDIT_DIR || path.join(projectRoot, "output/traces"), label), artifactDir: env.ARTIFACT_DIR, appDir });
+  }
+  let selected;
+  let documents;
+  if (apiUrl || (mode === "build" && scope.scope !== "site")) {
+    if (!apiUrl) throw new Error("CONTENT_API_URL is required for this build");
+    selected = await readApiCatalog(apiUrl, token, scope);
+    if (!selected.length) throw new Error("Cannot build an application without input targets");
+    documents = await readApiDocuments(apiUrl, selected, token);
+  } else {
+    selected = await sampleTargets(scope);
+    documents = await readLocalDocuments(projectRoot, selected);
+  }
+  if (mode === "validate") { console.log(`Valid: ${selected.map((site) => site.id).join(", ")}`); return; }
+  const work = await prepareWorkspace(projectRoot, selected, { documents, completeTemplates: Boolean(apiUrl) || scope.scope === "all" });
   let staging;
-  let stage = "prepare";
+  let stage = "build";
   try {
-    console.log(`${mode}: ${scope}; clean workspace: ${work}`);
-    await run("corepack", ["pnpm", "install", "--frozen-lockfile", "--offline", "--reporter=silent"], work, { ...process.env, CI: "true", NODE_ENV: "development" });
-    const next = path.join(work, "node_modules/next/dist/bin/next");
-    const env = { ...process.env, ...buildEnv, NODE_ENV: "production", BRAND_SITE_PRERENDER_SCOPE: scope, BRAND_SITE_BUILDING: "1" };
-    delete env.CONTENT_API_TOKEN;
-    delete env.ARTIFACT_BASE_URL;
-    if (mode === "typecheck") {
-      await run(process.execPath, [next, "typegen"], work, env);
-      await run(process.execPath, [path.join(work, "node_modules/typescript/bin/tsc"), "--noEmit"], work, env);
-      return;
-    }
-    stage = "build";
-    await run(process.execPath, [next, "build", "--webpack"], work, env);
-    console.log(`Build complete: ${scope}`);
-    if (mode === "publish") {
-      stage = "upload";
-      const { publishFiles } = await import("./publish-files.mjs");
-      await publishFiles({ nextDir: path.join(work, ".next"), artifactDir: requiredArtifactDir(), sites: selected });
-      console.log(`Upload complete: ${scope}`);
-    } else {
-      stage = "package";
-      staging = `${output}.tmp-${process.pid}`;
-      await mkdir(path.dirname(output), { recursive: true });
-      await rm(staging, { recursive: true, force: true });
-      await cp(path.join(work, ".next/standalone"), staging, { recursive: true, verbatimSymlinks: true });
-      await Promise.all([
-        cp(path.join(work, ".next/static"), path.join(staging, ".next/static"), { recursive: true }),
-        cp(path.join(work, "public"), path.join(staging, "public"), { recursive: true }),
-        writeFile(path.join(staging, "site-catalog.json"), JSON.stringify(catalog, null, 2)),
-      ]);
-      await rm(output, { recursive: true, force: true });
-      await rename(staging, output);
-      console.log(`Ready: ${output}`);
-    }
-    // Audit evidence is opt-in for publications and never uploaded to artifact storage.
-    if (auditDir) {
-      stage = "audit";
-      await rm(auditDir, { recursive: true, force: true });
-      await cp(path.join(work, ".next"), auditDir, { recursive: true, filter: async (source) => {
-        const relative = path.relative(path.join(work, ".next"), source);
-        if (relative.split(path.sep).some((part) => ["standalone", "cache", "static"].includes(part))) return false;
-        return (await stat(source)).isDirectory() || /(?:\.nft\.json|prerender-manifest\.json|client-reference-manifest\.js)$/.test(source);
-      } });
-    }
+    console.log(`${mode}: ${label}; clean workspace: ${work}`);
+    await compileWorkspace(work, buildEnvironment(env), runner, mode);
+    if (mode === "typecheck") return;
+    console.log(`Build complete: ${label}`);
+    stage = "package";
+    staging = `${output}.tmp-${process.pid}`;
+    await mkdir(path.dirname(output), { recursive: true });
+    await rm(staging, { recursive: true, force: true });
+    await cp(path.join(work, ".next/standalone"), staging, { recursive: true, verbatimSymlinks: true });
+    await Promise.all([
+      cp(path.join(work, ".next/static"), path.join(staging, ".next/static"), { recursive: true }),
+      cp(path.join(work, "public"), path.join(staging, "public"), { recursive: true }),
+      cp(path.join(work, "build-input"), path.join(staging, "build-input"), { recursive: true }),
+    ]);
+    await rm(output, { recursive: true, force: true });
+    await rename(staging, output);
+    console.log(`Ready: ${output}`);
+    if (auditDir) { stage = "audit"; await saveAudit(work, auditDir); }
   } catch (error) {
-    throw new Error(`${mode} ${scope} failed during ${stage}: ${error.message}`, { cause: error });
+    throw new Error(`${mode} ${label} failed during ${stage}: ${error.message}`, { cause: error });
   } finally {
     if (staging) await rm(staging, { recursive: true, force: true });
     await rm(work, { recursive: true, force: true });
-    console.log(`Cleanup complete: ${scope}`);
+    console.log(`Cleanup complete: ${label}`);
   }
 }
 
-function requiredArtifactDir() {
-  if (!process.env.ARTIFACT_DIR || !path.isAbsolute(process.env.ARTIFACT_DIR)) throw new Error("ARTIFACT_DIR must be an absolute path");
-  return process.env.ARTIFACT_DIR;
+/** Explicit sample commands get a disposable API, never an online fallback. */
+async function startSampleApi(scope, port, token) {
+  const { initializeContent, createContentServer, listen } = await import("./local-services.mjs");
+  const dataDir = await mkdtemp(path.join(os.tmpdir(), "brand-site-sample-api-"));
+  let server;
+  try {
+    await initializeContent(dataDir, { siteIds: (await sampleTargets(scope)).map((site) => site.id), port });
+    server = createContentServer({ dataDir, token });
+    const apiPort = await listen(server, 0);
+    return { url: `http://127.0.0.1:${apiPort}`, close: async () => {
+      try { await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
+      finally { await rm(dataDir, { recursive: true, force: true }); }
+    } };
+  } catch (error) {
+    if (server?.listening) await new Promise((resolve) => server.close(resolve));
+    await rm(dataDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function requiredArtifactDir(env) {
+  if (!env.ARTIFACT_DIR || !path.isAbsolute(env.ARTIFACT_DIR)) throw new Error("ARTIFACT_DIR must be an absolute path");
+  return env.ARTIFACT_DIR;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

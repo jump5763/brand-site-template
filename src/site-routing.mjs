@@ -1,59 +1,34 @@
-import catalog from "./site-catalog.json" with { type: "json" };
 import templateIds from "./template-ids.json" with { type: "json" };
 
-export const sites = catalog;
+const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
-/** @param {string} id */
-export function findSite(id) {
-  return sites.find((site) => site.id === id);
-}
-
-/** @param {string} [scope] */
-export function selectSites(scope = "all") {
-  if (scope === "all") return sites;
-  const site = findSite(scope);
-  if (!site) throw new Error(`Unknown site: ${scope}`);
-  return [site];
-}
-
-export function getBuildSites() {
-  return selectSites(process.env.BRAND_SITE_PRERENDER_SCOPE || "all");
-}
-
-/** @param {string} templateId */
-export function sitesForTemplate(templateId) {
-  return getBuildSites().filter((site) => site.templateId === templateId);
-}
-
-/** @param {string} host */
+/** Normalize only a Host authority, never a URL or forwarded-header list. */
 export function normalizeHostname(host) {
-  return host.toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
+  if (typeof host !== "string" || !host || /[\s/@,?#\\]/.test(host)) return "";
+  const match = /^(\[[0-9a-fA-F:]+\]|[^:]+)(?::([0-9]+))?$/.exec(host);
+  if (!match || (match[2] && (Number(match[2]) < 1 || Number(match[2]) > 65535))) return "";
+  const hostname = match[1].toLowerCase().replace(/\.$/, "");
+  if (hostname === "[::1]") return hostname;
+  if (hostname.length > 253 || !hostname.split(".").every((part) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(part))) return "";
+  return hostname;
 }
 
-/** @param {string} host */
-export function findSiteByHost(host) {
-  const hostname = normalizeHostname(host);
-  return sites.find((site) => site.hostname === hostname);
-}
-
-/** Keep pathname-dependent UI identical before and after a host rewrite.
- * @param {string} pathname
- */
+/** Keep pathname-dependent UI identical before and after a host rewrite. */
 export function publicPathname(pathname) {
   const match = pathname.match(/^\/sites\/([^/]+)\/[^/]+(?=\/|$)/);
   return (match && templateIds.includes(match[1]) ? pathname.slice(match[0].length) : pathname) || "/";
 }
 
-/** @param {string} host @param {string} pathname @param {string} [scope] */
-export function resolveSiteRequest(host, pathname, scope = "all") {
-  const selected = selectSites(scope);
-  const site = findSiteByHost(host);
-  if (!site || !selected.some((entry) => entry.id === site.id)) return null;
-  const prefix = `/sites/${site.templateId}/${site.id}`;
-  if (pathname === "/sites" || pathname.startsWith("/sites/")) {
-    return pathname === prefix || pathname.startsWith(`${prefix}/`)
-      ? { site, pathname }
-      : null;
+/** The caller supplies an API-verified identity; this module performs no I/O. */
+export function resolveSiteRequest(site, pathname) {
+  if (!site || typeof site.siteId !== "string" || !safeId.test(site.siteId) || !templateIds.includes(site.templateId) ||
+    typeof pathname !== "string" || !pathname.startsWith("/") || pathname.includes("\\") || pathname.includes("\0")) return null;
+  let decoded;
+  try { decoded = decodeURIComponent(pathname); } catch { return null; }
+  if (decoded.includes("\\") || decoded.includes("\0") || decoded.split("/").some((part) => part === "." || part === "..")) return null;
+  const prefix = `/sites/${site.templateId}/${site.siteId}`;
+  if (decoded === "/sites" || decoded.startsWith("/sites/")) {
+    return decoded === prefix || decoded.startsWith(`${prefix}/`) ? { site, pathname: decoded } : null;
   }
   // A regular route avoids Next's special dynamic sitemap file convention.
   const suffix = pathname === "/sitemap.xml" ? "/sitemap-data" : pathname === "/" ? "" : pathname;

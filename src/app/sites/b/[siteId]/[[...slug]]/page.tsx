@@ -2,8 +2,8 @@ import { loadSite } from "@/templates/b/site";
 import { renderPage } from "@/templates/b/site-schema/runtime/render-page";
 import { pageParams, pageMetadata, pagePath, renderContent, type SitePageProps } from "@/shared/site-pages";
 
-export const dynamic = "error";
-export const dynamicParams = false;
+export const dynamic = "force-static";
+export const dynamicParams = true;
 export async function generateStaticParams({ params }: { params: { siteId: string } }) {
   if (!params.siteId) return [];
   return pageParams(await loadSite(params.siteId));

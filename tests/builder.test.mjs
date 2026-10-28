@@ -11,7 +11,6 @@ import { fileURLToPath } from "node:url";
 import { createBuilder, createPublishRunner } from "../scripts/builder.mjs";
 
 const builderUrl = new URL("../scripts/builder.mjs", import.meta.url).href;
-const catalog = ["a1", "b1"].map((id) => ({ id, templateId: id[0], siteUrl: `http://${id}.localhost` }));
 const deferred = () => {
   let resolve;
   let reject;
@@ -21,7 +20,6 @@ const deferred = () => {
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "builder-test-"));
-  await writeFile(path.join(root, "site-catalog.json"), JSON.stringify(catalog));
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
@@ -53,16 +51,16 @@ function controlledRunner(inputFile) {
     maxActive = Math.max(active, maxActive);
     const job = { task, input: await readFile(inputFile, "utf8"), upload: deferred(), cleanup: deferred() };
     jobs.push(job);
-    events.push(`begin:${task.siteId || task.scope}`);
+    const label = task.siteId || task.templateId || task.scope;
+    events.push(`begin:${label}`);
     changes.emit("start");
     if (releasing) { job.upload.resolve(); job.cleanup.resolve(); }
     try {
       await job.upload.promise;
-      events.push(`uploaded:${task.siteId || task.scope}`);
+      events.push(`uploaded:${label}`);
     } finally {
-      await job.cleanup.promise;
-      active--;
-      events.push(`end:${task.siteId || task.scope}`);
+      try { await job.cleanup.promise; }
+      finally { active--; events.push(`end:${label}`); }
     }
   };
   return {
@@ -79,24 +77,34 @@ function controlledRunner(inputFile) {
   };
 }
 
-test("Builder requires a valid deployed catalog and never falls back to workspace sites", async (t) => {
+test("Builder requires APP_DIR configuration but reads no startup merchant catalog", async (t) => {
   const root = await fixture(t);
-  await assert.rejects(createBuilder({ appDir: path.join(root, "missing") }), /ENOENT/);
-  await writeFile(path.join(root, "site-catalog.json"), "[]");
-  await assert.rejects(createBuilder({ appDir: root }), /catalog/);
+  await assert.rejects(createBuilder({ appDir: "" }), /APP_DIR is required/);
+  const builder = await createBuilder({ appDir: path.join(root, "not-read-at-startup"), runner: async () => {}, logger: { log() {}, error() {} } });
+  assert.equal(builder.server.listening, false);
+  await builder.drain();
 });
 
 test("HTTP accepts only unambiguous scopes and reports 202, 400, 404 and 405", async (t) => {
   const root = await fixture(t);
   const tasks = [];
-  const { base } = await start(t, root, (task) => { tasks.push(task); });
+  const { base, logs } = await start(t, root, (task) => {
+    tasks.push(task);
+    if (task.siteId === "unknown") throw new Error("Public API: site is not publishable");
+  });
   const invalid = [
     "", "{", "null", "[]", "true", "{}", '{"scope":"unknown"}',
     '{"scope":"site"}', '{"scope":"site","siteId":""}',
     '{"scope":"site","siteId":1}', '{"scope":"site","siteId":"../a1"}',
+    '{"scope":"template"}', '{"scope":"template","templateId":""}',
+    '{"scope":"template","templateId":1}', '{"scope":"template","templateId":"../a"}',
+    '{"scope":"template","siteId":"a1"}', '{"scope":"site","templateId":"a"}',
+    '{"scope":"template","templateId":"a","siteId":"a1"}',
     '{"scope":"all","siteId":"a1"}', '{"scope":"all","siteId":null}',
+    '{"scope":"all","templateId":"a"}',
     '{"scope":"all","extra":true}', '{"scope":"site","siteId":"a1","extra":true}',
     '{"scope":"site","scope":"all"}', '{"scope":"site","siteId":"b1","siteId":"a1"}',
+    '{"scope":"template","templateId":"a","templateId":"b"}',
     '{"scope":"all","\\u0073cope":"all"}', `{"scope":"${"a".repeat(17_000)}"}`,
   ];
   for (const body of invalid) {
@@ -104,27 +112,27 @@ test("HTTP accepts only unambiguous scopes and reports 202, 400, 404 and 405", a
     assert.equal(response.status, 400, body.slice(0, 80));
     assert.equal((await response.json()).accepted, false);
   }
-  const unknown = await post(base, { scope: "site", siteId: "a2" });
-  assert.equal(unknown.status, 404);
-  assert.equal((await unknown.json()).accepted, false);
   assert.equal((await fetch(`${base}/build`)).status, 405);
   assert.equal((await post(`${base}/unknown`, { scope: "all" })).status, 404);
   assert.deepEqual(tasks, []);
-  for (const task of [{ scope: "site", siteId: "a1" }, { scope: "all" }]) {
+  const valid = [{ scope: "site", siteId: "a3" }, { scope: "template", templateId: "a" }, { scope: "all" }, { scope: "site", siteId: "unknown" }];
+  for (const task of valid) {
     const response = await post(base, task);
     assert.equal(response.status, 202);
     assert.deepEqual(await response.json(), { accepted: true });
   }
-  assert.deepEqual(tasks, [{ scope: "site", siteId: "a1" }, { scope: "all" }]);
+  assert.deepEqual(tasks, valid);
+  assert.equal(logs.filter((line) => line.startsWith("Builder accepted:")).length, valid.length);
+  assert.ok(logs.includes("Builder failed: site:unknown; publish; Public API: site is not publishable"));
 });
 
-test("FIFO preserves a1 → b1 → a1 → all, waits for upload and cleanup, and continues after failure", { timeout: 10_000 }, async (t) => {
+test("FIFO preserves site → template → site → all, waits for upload and cleanup, and continues after both failures", { timeout: 10_000 }, async (t) => {
   const root = await fixture(t);
   const inputFile = path.join(root, "content.txt");
   await writeFile(inputFile, "initial");
   const control = controlledRunner(inputFile);
   const { base, drain, logs } = await start(t, root, control.runner, () => control.releaseAll());
-  const requested = [{ scope: "site", siteId: "a1" }, { scope: "site", siteId: "b1" }, { scope: "site", siteId: "a1" }, { scope: "all" }];
+  const requested = [{ scope: "site", siteId: "a3" }, { scope: "template", templateId: "a" }, { scope: "site", siteId: "a3" }, { scope: "all" }];
   for (const task of requested) assert.equal((await post(base, task)).status, 202);
   const first = await control.started(1);
   assert.equal(first.input, "initial");
@@ -142,7 +150,7 @@ test("FIFO preserves a1 → b1 → a1 → all, waits for upload and cleanup, and
   second.cleanup.resolve();
   const repeated = await control.started(3);
   repeated.upload.resolve();
-  repeated.cleanup.resolve();
+  repeated.cleanup.reject(new Error("test cleanup failed"));
   const all = await control.started(4);
   all.upload.resolve();
   all.cleanup.resolve();
@@ -150,9 +158,12 @@ test("FIFO preserves a1 → b1 → a1 → all, waits for upload and cleanup, and
   assert.deepEqual(control.jobs.map((job) => job.task), requested);
   assert.equal(control.maxActive, 1);
   assert.deepEqual(control.events.filter((event) => !event.startsWith("uploaded:")), [
-    "begin:a1", "end:a1", "begin:b1", "end:b1", "begin:a1", "end:a1", "begin:all", "end:all",
+    "begin:a3", "end:a3", "begin:a", "end:a", "begin:a3", "end:a3", "begin:all", "end:all",
   ]);
-  assert.ok(logs.includes("Builder failed: site:b1; publish; test upload failed"));
+  assert.ok(logs.includes("Builder failed: template:a; publish; test upload failed"));
+  assert.ok(logs.includes("Builder failed: site:a3; publish; test cleanup failed"));
+  assert.equal(logs.filter((line) => line.endsWith("; success")).length, 2);
+  assert.equal(logs.filter((line) => line.endsWith("; failed")).length, 2);
   assert.equal(logs.filter((line) => line.startsWith("Builder begin:")).length, 4);
   assert.equal(logs.filter((line) => line.startsWith("Builder end:")).length, 4);
 });
@@ -259,21 +270,28 @@ await main({ runner: createPublishRunner({ appDir: process.env.APP_DIR, projectD
   };
   await waitFor(/Builder listening: http:\/\/127\.0\.0\.1:\d+/);
   const base = output.match(/Builder listening: (http:\/\/127\.0\.0\.1:\d+)/)[1];
-  assert.equal((await post(base, { scope: "site", siteId: "a1" })).status, 202);
-  await waitFor(/Fixture begin: a1; before/);
+  assert.equal((await post(base, { scope: "site", siteId: "a3" })).status, 202);
+  await waitFor(/Fixture begin: a3; before/);
+  assert.equal((await post(base, { scope: "template", templateId: "a" })).status, 202);
   assert.equal((await post(base, { scope: "all" })).status, 202);
   child.kill("SIGTERM");
   await waitFor(/Builder stopping:/);
   child.kill("SIGTERM");
   assert.equal((await post(base, { scope: "all" })).status, 503);
   assert.equal(exited, false);
-  assert.doesNotMatch(output, /Fixture begin: all|Unexpected publish SIGTERM/);
+  assert.doesNotMatch(output, /Fixture begin: a;|Fixture begin: all|Unexpected publish SIGTERM/);
   await writeFile(path.join(root, "input.txt"), "after enqueue");
-  await writeFile(path.join(root, "a1.upload"), "");
-  await waitFor(/Fixture cleanup: a1/);
+  await writeFile(path.join(root, "a3.upload"), "");
+  await waitFor(/Fixture cleanup: a3/);
   assert.equal(exited, false);
   assert.doesNotMatch(output, /Fixture begin: all/);
-  await writeFile(path.join(root, "a1.cleanup"), "");
+  await writeFile(path.join(root, "a3.cleanup"), "");
+  await waitFor(/Fixture begin: a; after enqueue/);
+  assert.doesNotMatch(output, /Fixture begin: all/);
+  await writeFile(path.join(root, "a.upload"), "");
+  await waitFor(/Fixture cleanup: a\n/);
+  assert.equal(exited, false);
+  await writeFile(path.join(root, "a.cleanup"), "");
   await waitFor(/Fixture begin: all; after enqueue/);
   assert.equal((await post(base, { scope: "all" })).status, 503);
   await writeFile(path.join(root, "all.upload"), "");
@@ -281,23 +299,25 @@ await main({ runner: createPublishRunner({ appDir: process.env.APP_DIR, projectD
   assert.equal(exited, false);
   await writeFile(path.join(root, "all.cleanup"), "");
   assert.deepEqual(await closed, [0, null]);
-  assert.match(output, /Fixture args: \["publish","--site","a1"\]/);
+  assert.match(output, /Fixture args: \["publish","--site","a3"\]/);
+  assert.match(output, /Fixture args: \["publish","--template","a"\]/);
   assert.match(output, /Fixture args: \["publish","--all"\]/);
   assert.doesNotMatch(output, /Unexpected publish SIGTERM/);
   assert.ok(output.indexOf("Fixture complete: all") < output.indexOf("Builder drained"));
   assert.equal(exited, true);
 });
 
-test("Builder command fails before listening when the deployment catalog is missing", async (t) => {
-  const root = await fixture(t);
+test("Builder command fails before listening when APP_DIR is not configured", async () => {
+  const env = { ...process.env, BUILDER_PORT: "0" };
+  delete env.APP_DIR;
   const child = spawn(process.execPath, [fileURLToPath(builderUrl)], {
-    env: { ...process.env, APP_DIR: path.join(root, "missing"), BUILDER_PORT: "0" },
+    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
   child.stdout.on("data", (data) => { output += data; });
   child.stderr.on("data", (data) => { output += data; });
   assert.deepEqual(await once(child, "close"), [1, null]);
-  assert.match(output, /ENOENT/);
+  assert.match(output, /APP_DIR is required/);
   assert.doesNotMatch(output, /Builder listening:/);
 });
