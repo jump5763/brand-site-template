@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.23.1"
   },
   "scripts": {
     "dev": "node scripts/sites.mjs dev",
@@ -18,7 +18,7 @@
     "publish": "node scripts/sites.mjs publish",
     "upload": "node scripts/sites.mjs upload",
     "local:services": "node scripts/local-services.mjs",
-    "builder": "node scripts/builder.mjs"
+    "local:stack": "node --env-file=.env.local scripts/local-stack.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.0.1",

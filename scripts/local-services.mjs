@@ -93,7 +93,8 @@ export function createArtifactServer({ artifactDir, onRequest = () => {} }) {
         "Content-Type": `${types[path.extname(filename)] || "application/octet-stream"}`,
         "Content-Length": info.size,
         "Last-Modified": info.mtime.toUTCString(),
-        "Cache-Control": pathname.startsWith("/_next/static/") ? "public, max-age=31536000, immutable" : "no-store",
+        "Cache-Control": pathname.startsWith("/_next/static/") || /^\/runtimes\/[^/]+\/sites\/[^/]+\/[^/]+\/releases\//.test(pathname)
+          ? "public, max-age=31536000, immutable" : "no-store",
       });
       response.end(request.method === "HEAD" ? undefined : await readFile(filename));
     } catch (error) {

@@ -1,138 +1,91 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { access, mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
-import os from "node:os";
+import { access, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { initializeContent, createContentServer, listen } from "../scripts/local-services.mjs";
-import { readApiCatalog, normalizeScope } from "../scripts/content-input.mjs";
-import { parseArgs, publishScope, main } from "../scripts/sites.mjs";
-import { put } from "./helpers/artifacts.mjs";
+import { parseArgs, main } from "../scripts/sites.mjs";
+import { normalizeScope } from "../scripts/content-input.mjs";
+import { installedTemplate } from "./helpers/installed-template.mjs";
+import { put, seedArtifacts } from "./helpers/artifacts.mjs";
 
-const gate = () => { let resolve; const promise = new Promise((ready) => { resolve = ready; }); return { promise, resolve }; };
+const runtimeId = "runtime-r2", jobId = "job-r2";
+const args = (mode, f) => [mode, "--input-dir", f.inputDir, "--runtime-id", runtimeId, "--job-id", jobId, "--result-file", path.join(f.root, "result.json")];
 
-async function fixture(t) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "publication-test-"));
-  const dataDir = path.join(root, "data");
-  const appDir = path.join(root, "app");
-  const artifactDir = path.join(root, "artifacts");
-  await initializeContent(dataDir, { siteIds: ["a1", "b1"] });
-  const catalog = JSON.parse(await readFile(path.join(dataDir, "catalog.json"), "utf8"));
-  const a3 = JSON.parse((await readFile(path.join(dataDir, "a1.json"), "utf8")).replaceAll("a1.localhost", "a3.localhost"));
-  a3.siteId = "a3";
-  await writeFile(path.join(dataDir, "a3.json"), JSON.stringify(a3));
-  catalog.sites.push({ siteId: "a3", templateId: "a", siteUrl: a3.siteUrl, public: true });
-  await writeFile(path.join(dataDir, "catalog.json"), JSON.stringify(catalog));
-  await Promise.all([
-    put(appDir, "src/template-ids.json", JSON.stringify(["a", "b"])),
-    put(appDir, ".next/required-server-files.json", JSON.stringify({ config: { assetPrefix: "", env: { SEARCH_INDEXING_ENABLED: "false" } } })),
-    put(appDir, "site-catalog.json", "historical list is not an input"),
-    mkdir(artifactDir, { recursive: true }),
-  ]);
-  let fault = () => null;
-  const requests = [];
-  const server = createContentServer({ dataDir, onRequest: (...args) => requests.push(args), fault: (context) => fault(context) });
-  const port = await listen(server, 0);
-  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await rm(root, { recursive: true, force: true }); });
-  return { root, dataDir, appDir, artifactDir, catalog, requests, setFault: (value) => { fault = value; },
-    env: { PATH: process.env.PATH, CONTENT_API_URL: `http://127.0.0.1:${port}`, APP_DIR: appDir, ARTIFACT_DIR: artifactDir } };
+async function deployed(f) {
+  const appDir = path.join(f.root, "app");
+  await put(appDir, "runtime.json", JSON.stringify({ runtimeId }));
+  await put(appDir, "src/template-ids.json", '["template-a"]');
+  await put(appDir, ".next/required-server-files.json", JSON.stringify({ config: { assetPrefix: "", env: { SEARCH_INDEXING_ENABLED: "false" } } }));
+  return { APP_DIR: appDir, ARTIFACT_DIR: path.join(f.root, "artifacts"), CONTENT_API_URL: "http://must-not-be-read.invalid" };
 }
 
-test("CLI scopes are structured, mutually exclusive and safe", () => {
-  for (const [args, scope] of [
-    [["publish", "--all"], { scope: "all" }], [["publish", "--template", "a"], { scope: "template", templateId: "a" }],
-    [["publish", "--site=a3"], { scope: "site", siteId: "a3" }],
-  ]) { assert.deepEqual(parseArgs(args).scope, scope); assert.equal(args[0], "publish"); }
-  for (const args of [["--all", "--site", "a3"], ["--template"], ["--site", "../a3"], ["--template=a", "--all"], ["--unknown"]]) {
-    assert.throws(() => parseArgs(["publish", ...args]));
-  }
-  for (const scope of [{ scope: "all", siteId: "a3" }, { scope: "site", siteId: 1 }, { scope: "template", templateId: "a", siteId: "a3" }]) assert.throws(() => normalizeScope(scope));
+test("CLI uses explicit job/source inputs and mutually exclusive structured scopes", async () => {
+  for (const [options, scope] of [[["--all"], { scope: "all" }], [["--template", "template-a"], { scope: "template", templateId: "template-a" }], [["--site=tenant-r2"], { scope: "site", siteId: "tenant-r2" }]]) assert.deepEqual(parseArgs(["publish", ...options]).scope, scope);
+  for (const options of [["--all", "--site", "a3"], ["--template"], ["--site", "../a3"], ["--unknown"], ["--runtime-id", "../bad"]]) assert.throws(() => parseArgs(["publish", ...options]));
+  assert.throws(() => normalizeScope({ scope: "all", siteId: "a3" }));
+  await assert.rejects(main(["build"]), /runtime-id and --job-id are required/);
+  await assert.rejects(main(["publish", "--runtime-id", runtimeId, "--job-id", jobId]), /input-dir/);
 });
 
-test("API selects all/template/site including a3 and refuses wrong response scopes", async (t) => {
-  const state = await fixture(t);
-  assert.deepEqual((await readApiCatalog(state.env.CONTENT_API_URL)).map((site) => site.id), ["a1", "b1", "a3"]);
-  assert.deepEqual((await readApiCatalog(state.env.CONTENT_API_URL, undefined, { scope: "template", templateId: "a" })).map((site) => site.id), ["a1", "a3"]);
-  assert.deepEqual((await readApiCatalog(state.env.CONTENT_API_URL, undefined, { scope: "site", siteId: "a3" })).map((site) => site.id), ["a3"]);
-  state.setFault(({ url }) => url.pathname === "/sites" ? { status: 200, body: state.catalog } : null);
-  await assert.rejects(readApiCatalog(state.env.CONTENT_API_URL, undefined, { scope: "site", siteId: "a3" }), /scope mismatch/);
-  await assert.rejects(readApiCatalog(state.env.CONTENT_API_URL, undefined, { scope: "template", templateId: "a" }), /scope mismatch/);
-});
-
-test("one publication fixes current input once, builds once and waits for upload plus cleanup", async (t) => {
-  const state = await fixture(t);
-  const uploading = gate(); const uploaded = gate(); const cleaning = gate(); const cleaned = gate();
-  const calls = [];
+test("empty merchant build packages runtime and previews, and distributes static assets without pointers", async (t) => {
+  const f = await installedTemplate(t);
+  const appDir = path.join(f.root, "app");
+  const artifactDir = path.join(f.root, "artifacts");
   let work;
-  let settled = false;
-  const original = JSON.parse(await readFile(path.join(state.dataDir, "a3.json"), "utf8"));
-  const task = main(["publish", "--site", "a3"], {
-    env: { ...state.env, CONTENT_API_TOKEN: "", ARTIFACT_BASE_URL: "http://must-not-sync", BRAND_SITE_BUILD_INPUT_ROOT: "/must-not-read" },
-    runner: async (command, args, cwd, env) => {
-      calls.push({ command, args }); work = cwd;
-      assert.equal(env.CONTENT_API_URL, undefined); assert.equal(env.CONTENT_API_TOKEN, undefined);
-      assert.equal(env.ARTIFACT_BASE_URL, undefined); assert.equal(env.BRAND_SITE_BUILD_INPUT_ROOT, undefined);
-      assert.equal(env.BRAND_SITE_BUILDING, "1");
-      const input = JSON.parse(await readFile(path.join(cwd, "build-input/sites.json"), "utf8"));
-      assert.deepEqual(input.map((site) => site.id), ["a3"]);
-      await access(path.join(cwd, "src/app/sites/b/[siteId]/layout.tsx"));
-      assert.deepEqual(JSON.parse(await readFile(path.join(cwd, "src/template-ids.json"), "utf8")), ["a", "b"]);
-      const later = structuredClone(original); later.pages[0].metadata.title = "edited after fixed input";
-      await writeFile(path.join(state.dataDir, "a3.json"), JSON.stringify(later));
-      assert.equal(JSON.parse(await readFile(path.join(cwd, "sites/a3/current.json"), "utf8")).pages[0].metadata.title, original.pages[0].metadata.title);
-    },
-    publish: async ({ nextDir, artifactDir, sites }) => {
-      assert.equal(nextDir, path.join(work, ".next")); assert.equal(artifactDir, state.artifactDir);
-      assert.deepEqual(sites.map((site) => site.id), ["a3"]); uploading.resolve(); await uploaded.promise;
-    },
-    cleanup: async (dir, options) => { assert.equal(dir, work); cleaning.resolve(); await cleaned.promise; await rm(dir, options); },
-  }).finally(() => { settled = true; });
-  await uploading.promise; assert.equal(settled, false);
-  uploaded.resolve(); await cleaning.promise; assert.equal(settled, false);
-  cleaned.resolve(); assert.deepEqual(await task, { status: "published", siteIds: ["a3"] });
-  assert.equal(calls.filter(({ args }) => args.includes("build")).length, 1);
-  assert.equal(calls.filter(({ args }) => args.includes("install")).length, 1);
-  assert.equal(state.requests.filter(([, pathname]) => pathname === "/sites").length, 1);
-  assert.equal(state.requests.filter(([, pathname]) => pathname === "/sites/a3/content").length, 1);
-  assert.equal(state.requests.filter(([, pathname]) => /^\/sites\/[^/]+\/content$/.test(pathname)).length, 1);
+  const result = await main([...args("build", f), "--output", appDir], { sourceRoot: f.sourceRoot, env: { ARTIFACT_DIR: artifactDir }, runner: async (command, _args, cwd) => {
+    work = cwd;
+    if (command === "corepack") return;
+    await access(path.join(cwd, "src/app/healthz/route.ts"));
+    await access(path.join(cwd, "src/app/preview/template-a/layout.tsx"));
+    await put(cwd, ".next/standalone/server.js", "// Compilation is stubbed only in this module test.\n");
+    await put(cwd, ".next/standalone/.next/required-server-files.json", "{}");
+    await put(cwd, ".next/server/app/placeholder", "");
+    await put(cwd, ".next/prerender-manifest.json", '{"routes":{}}');
+    await put(cwd, ".next/static/chunks/preview-123.js", "preview code");
+  } });
+  assert.equal(result.appDir, await realpath(appDir));
+  assert.deepEqual(result.publications, []);
+  assert.equal(result.runtimeId, runtimeId);
+  assert.equal(JSON.parse(await readFile(path.join(appDir, "runtime.json"), "utf8")).runtimeId, runtimeId);
+  await access(path.join(appDir, "previews/template-a.json"));
+  await access(path.join(artifactDir, "_next/static/chunks/preview-123.js"));
+  await assert.rejects(access(path.join(artifactDir, "runtimes")), { code: "ENOENT" });
+  assert.deepEqual(JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8")), result);
   await assert.rejects(access(work), { code: "ENOENT" });
 });
 
-test("empty all/template skip, missing site and unavailable API fail before preparation", async (t) => {
-  const state = await fixture(t);
-  await writeFile(path.join(state.dataDir, "catalog.json"), JSON.stringify({ sites: [] }));
-  const dependencies = { env: state.env, prepare: () => assert.fail("No workspace expected"), runner: () => assert.fail("No build expected") };
-  for (const scope of [{ scope: "all" }, { scope: "template", templateId: "a" }]) {
-    assert.deepEqual(await publishScope(scope, dependencies), { status: "skipped", siteIds: [] });
-  }
-  await assert.rejects(publishScope({ scope: "site", siteId: "a3" }, dependencies), /input validation.*404/);
-  await assert.rejects(publishScope({ scope: "template", templateId: "c" }, dependencies), /not installed/);
-  await assert.rejects(main(["build", "--all", "--output", path.join(state.root, "new-app")], { env: { ...state.env, BUILD_AUDIT_DIR: path.join(process.cwd(), "output/api-scoped-publish-validation/m2-0001/unused-audit") }, runner: () => assert.fail("No build expected") }), /without input targets/);
-  state.setFault(() => ({ status: 503 }));
-  await assert.rejects(publishScope({ scope: "all" }, dependencies), /input validation.*503/);
-  await assert.rejects(main(["build", "--all", "--output", path.join(state.root, "new-app")], { env: { ...state.env, BUILD_AUDIT_DIR: path.join(process.cwd(), "output/api-scoped-publish-validation/m2-0001/unused-audit") }, runner: () => assert.fail("No build expected") }), /503/);
+test("content publication fixes disk input once and emits real immutable writer results without fetching API", async (t) => {
+  const f = await installedTemplate(t, { merchant: true });
+  const env = await deployed(f);
+  let work, builds = 0;
+  const title = f.document.pages[0].metadata.title;
+  const result = await main([...args("publish", f), "--site", f.config.id], { sourceRoot: f.sourceRoot, env, runner: async (command, _args, cwd, buildEnv) => {
+    work = cwd;
+    assert.equal(buildEnv.CONTENT_API_URL, undefined);
+    assert.equal(buildEnv.BRAND_SITE_BUILDING, "1");
+    assert.equal(JSON.parse(await readFile(path.join(cwd, f.config.contentFile), "utf8")).pages[0].metadata.title, title);
+    const later = structuredClone(f.document); later.pages[0].metadata.title = "saved after snapshot";
+    await writeFile(path.join(f.inputDir, f.config.contentFile), JSON.stringify(later));
+    if (command !== "corepack") { builds++; await seedArtifacts(path.join(cwd, ".next"), { id: f.config.id, templateId: f.config.templateId }); }
+  } });
+  assert.equal(builds, 1);
+  assert.equal(result.status, "published");
+  assert.equal(result.publications[0].current.publishId, jobId);
+  assert.equal(result.publications[0].current.runtimeId, runtimeId);
+  assert.equal(result.publications[0].siteId, f.config.id);
+  await assert.rejects(access(work), { code: "ENOENT" });
 });
 
-test("bad public documents, build, upload and cleanup failures never report publication success", async (t) => {
-  const state = await fixture(t);
-  const scope = { scope: "site", siteId: "a3" };
-  const original = await readFile(path.join(state.dataDir, "a3.json"), "utf8");
-  const bad = JSON.parse(original); delete bad.pages;
-  await writeFile(path.join(state.dataDir, "a3.json"), JSON.stringify(bad));
-  await assert.rejects(publishScope(scope, { env: state.env, prepare: () => assert.fail("Invalid input must not prepare") }), /input validation.*Schema/);
-  await writeFile(path.join(state.dataDir, "a3.json"), original);
+test("publication failure writes completed merchant results and cleans its work without reporting success", async (t) => {
+  const f = await installedTemplate(t, { merchant: true });
+  const env = await deployed(f);
   let work;
-  await assert.rejects(publishScope(scope, { env: state.env,
-    runner: async (_command, _args, cwd) => { work = cwd; throw new Error("build fixture failed"); },
-    publish: () => assert.fail("Build failure must not upload"),
-  }), /during build.*fixture failed/);
-  await assert.rejects(access(work), { code: "ENOENT" });
-  await assert.rejects(publishScope(scope, { env: state.env,
-    runner: async (_command, _args, cwd) => { work = cwd; }, publish: async () => { throw new Error("upload fixture failed"); },
-  }), /during upload.*fixture failed/);
-  await assert.rejects(access(work), { code: "ENOENT" });
-  await assert.rejects(publishScope(scope, { env: state.env,
-    runner: async (_command, _args, cwd) => { work = cwd; }, publish: async () => {},
-    cleanup: async (dir, options) => { await rm(dir, options); throw new Error("cleanup fixture failed"); },
-  }), /during cleanup.*fixture failed/);
+  const completed = [{ siteId: "previous-merchant", current: { publishId: jobId } }];
+  await assert.rejects(main(args("publish", f), { sourceRoot: f.sourceRoot, env,
+    runner: async (_command, _args, cwd) => { work = cwd; },
+    publish: async () => { throw Object.assign(new Error("disk failure"), { publications: completed }); },
+  }), /during upload.*disk failure/);
+  const saved = JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8"));
+  assert.match(saved.error, /disk failure/);
+  assert.deepEqual(saved.publications, completed);
   await assert.rejects(access(work), { code: "ENOENT" });
 });

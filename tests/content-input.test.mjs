@@ -40,7 +40,7 @@ test("API snapshot stays fixed, validates identities and retains full code for s
   await writeFile(path.join(root, "a1.json"), JSON.stringify(changed));
   await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), /identity mismatch/);
   await writeFile(path.join(root, "a1.json"), JSON.stringify({ siteId: "a1", siteUrl: catalog[0].siteUrl }));
-  await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), /Schema/);
+  await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), (error) => error.status === 422 && error.diagnostics.length > 0);
   assert.equal((await fetch(`${base}/sites/nope/content`, { headers: { Authorization: "Bearer test-only" } })).status, 404);
   for (const entry of [
     [{ templateId: "a", siteUrl: "http://a.localhost" }],

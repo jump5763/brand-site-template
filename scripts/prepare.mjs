@@ -1,17 +1,17 @@
-import { cp, mkdir, mkdtemp, realpath, writeFile, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, realpath, readFile, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { readLocalDocuments } from "./content-input.mjs";
-import templateIds from "../src/template-ids.json" with { type: "json" };
 
 /** Only explicit source inputs cross into the temporary build root. */
-export async function prepareWorkspace(projectRoot, selected, { catalog = selected, documents, completeTemplates = false } = {}) {
-  if (!Array.isArray(selected) || !selected.length) throw new Error("No fixed build targets");
+export async function prepareWorkspace(projectRoot, selected, { catalog = selected, documents, previews = [], completeTemplates = false, runtimeId, jobId } = {}) {
+  if (!Array.isArray(selected) || (!selected.length && !previews.length)) throw new Error("No fixed build targets");
   documents ??= await readLocalDocuments(projectRoot, selected);
   assertDocumentSelection(selected, documents);
   const work = await realpath(await mkdtemp(path.join(os.tmpdir(), "brand-site-")));
   try {
-    const templates = completeTemplates ? templateIds : [...new Set(catalog.map((site) => site.templateId))];
+    const registered = JSON.parse(await readFile(path.join(projectRoot, "src/template-ids.json"), "utf8"));
+    const templates = completeTemplates ? registered : [...new Set([...catalog.map((site) => site.templateId), ...previews.map((preview) => preview.templateId)])];
     const copy = async (relative) => {
       const target = path.join(work, relative);
       await mkdir(path.dirname(target), { recursive: true });
@@ -19,8 +19,9 @@ export async function prepareWorkspace(projectRoot, selected, { catalog = select
     };
     await Promise.all([
       ...["package.json", "pnpm-lock.yaml", ".npmrc", "tsconfig.json", "next.config.ts", "cache-handler.cjs", "postcss.config.mjs", "tailwind.config.cjs",
-        "src/app/(index)", "src/styles", "src/shared", "src/server", "src/load-site.ts", "src/site-routing.mjs", "src/template-ids.json", "src/proxy.ts"].map(copy),
+        "src/app/(index)", "src/app/healthz", "src/styles", "src/shared", "src/server", "src/load-site.ts", "src/site-routing.mjs", "src/template-ids.json", "src/proxy.ts"].map(copy),
       ...templates.flatMap((template) => [`src/templates/${template}`, `src/app/sites/${template}`]).map(copy),
+      ...previews.map(({ templateId }) => copy(`src/app/preview/${templateId}`)),
     ]);
     await mkdir(path.join(work, "public"), { recursive: true });
     // Missing media directories are normal; never copy another merchant's assets.
@@ -31,6 +32,12 @@ export async function prepareWorkspace(projectRoot, selected, { catalog = select
     await mkdir(path.join(work, "build-input"), { recursive: true });
     await writeFile(path.join(work, "build-input/sites.json"), JSON.stringify(selected, null, 2));
     await writeDocuments(work, documents);
+    await mkdir(path.join(work, "previews"), { recursive: true });
+    await Promise.all(previews.map(({ templateId, document }) => {
+      if (!templates.includes(templateId) || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(templateId)) throw new Error("Invalid fixed preview input");
+      return writeFile(path.join(work, "previews", `${templateId}.json`), JSON.stringify(document));
+    }));
+    if (runtimeId) await writeFile(path.join(work, "runtime.json"), JSON.stringify({ runtimeId, jobId }));
     return work;
   } catch (error) {
     await rm(work, { recursive: true, force: true });

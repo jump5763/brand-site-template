@@ -27,3 +27,9 @@ export async function readBuildDocument(templateId, siteId, root = inputRoot()) 
     (config.siteUrl && document.siteUrl !== config.siteUrl)) throw new Error(`Fixed input identity mismatch: ${siteId}`);
   return document;
 }
+
+/** Preview input is fixed with the application, never a merchant API response. */
+export async function readPreviewDocument(templateId, root = inputRoot()) {
+  if (!safeId.test(templateId)) throw new Error("Invalid preview template ID");
+  return JSON.parse(await readFile(path.join(root, "previews", `${templateId}.json`), "utf8"));
+}

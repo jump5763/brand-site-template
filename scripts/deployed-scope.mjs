@@ -32,11 +32,11 @@ export async function readDeployedBaseline(appDir) {
 }
 
 /** Validate installed code/configuration, not a previous merchant/page snapshot. */
-export function validateDeployedCapabilities({ baseline, selected, scope, env = process.env }) {
+export function validateDeployedCapabilities({ baseline, selected, scope, env = process.env, registeredTemplates = sourceTemplates }) {
   const needed = new Set(selected.map((site) => site.templateId));
   if (scope.scope === "template") needed.add(scope.templateId);
   for (const template of needed) {
-    if (!baseline.templates.includes(template) || !sourceTemplates.includes(template)) {
+    if (!baseline.templates.includes(template) || !registeredTemplates.includes(template)) {
       throw deploymentRequired(`Template is not installed in the application and source: ${template}`);
     }
   }

@@ -1,0 +1,61 @@
+import assert from "node:assert/strict";
+import { mkdirSync, readFileSync, writeFileSync, cpSync, readdirSync } from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { app } from "electron";
+import { TemplateService } from "../../../../design-coding-agent/src/main/workspace/template-service";
+import { AppCreationService } from "../../../../design-coding-agent/src/main/dyad/app/create";
+import { AppImportService } from "../../../../design-coding-agent/src/main/dyad/app/import";
+import { GitService } from "../../../../design-coding-agent/src/main/dyad/version/git-service";
+import { GitToolchainResolver } from "../../../../design-coding-agent/src/main/dyad/version/git-toolchain";
+import { createCreationTestDatabase } from "../../../../design-coding-agent/tests/app/creation-operation-fixture";
+import { SourcePreparation } from "../../../../design-coding-agent/src/main/template-publishing/source-preparation";
+import { PreviewCapture } from "../../../../design-coding-agent/src/main/template-publishing/preview-capture";
+
+type Configuration = { designerRoot: string; temporary: string; evidence: string; nodePath: string; pnpmCliPath: string };
+const config = JSON.parse(readFileSync(process.argv.at(-1)!, "utf8")) as Configuration;
+app.setPath("userData", path.join(config.temporary, "electron-profile"));
+app.on("before-quit", event => event.preventDefault());
+const save = (name: string, value: unknown) => writeFileSync(path.join(config.evidence, name), JSON.stringify(value, null, 2) + "\n");
+async function run() {
+  await app.whenReady();
+  const appsRoot = path.join(config.temporary, "apps");
+  mkdirSync(appsRoot, { recursive: true });
+  const sqlite = createCreationTestDatabase();
+  try {
+    const git = new GitService({ toolchain: new GitToolchainResolver().resolveSystem(), hooksDirectory: path.join(config.temporary, "hooks") });
+    const template = new TemplateService({ bundledRoot: path.join(config.designerRoot, "resources/templates/next-default"), manifestPath: path.join(config.designerRoot, "resources/templates/next-default.manifest.json") });
+    const service = new AppCreationService({ sqlite, appsRoot, template, importer: new AppImportService(), git });
+    const created = await service.createBundled({ operationId: `create-app:${randomUUID()}`, windowSessionId: randomUUID(), name: "New App contract acceptance" });
+    assert.equal(created.packageManager, "pnpm");
+    assert.deepEqual(sqlite.prepare("SELECT COUNT(*) AS count FROM apps").get(), { count: 1 });
+    assert.deepEqual(sqlite.prepare("SELECT COUNT(*) AS count FROM chats").get(), { count: 1 });
+    assert.deepEqual(sqlite.prepare("SELECT COUNT(*) AS count FROM versions").get(), { count: 1 });
+    save("created-app.json", { ...created, entry: "AppCreationService.createBundled", actualTemplateService: true, actualGitService: true, isolatedInMemorySQLite: true, llmGenerated: false });
+    const root = created.rootPath;
+    const section = path.join(root, "src/sections/example.default");
+    cpSync(path.join(root, ".agents/skills/create-section/assets/section-template"), section, { recursive: true });
+    const viewFile = path.join(section, "view.tsx");
+    writeFileSync(viewFile, readFileSync(viewFile, "utf8").replace("headingLevel={2}", "headingLevel={1}").replace("top-level content section below the page's h1", "page hero providing its h1"));
+    const documentPath = path.join(root, "src/site-schema/current.json");
+    const document = JSON.parse(readFileSync(documentPath, "utf8"));
+    document.pages[0].metadata.title = "New App installation contract acceptance";
+    document.pages[0].sections = [{ id: "new-app-hero", type: "example", variant: "default", content: { title: "New App portable section verified" } }];
+    writeFileSync(documentPath, JSON.stringify(document, null, 2) + "\n");
+    const pnpm = (args: string[]) => execFileSync(config.nodePath, [config.pnpmCliPath, ...args], { cwd: root, stdio: "inherit", env: { ...process.env, CI: "true" } });
+    pnpm(["install", "--frozen-lockfile", "--ignore-scripts", "--offline"]);
+    pnpm(["run", "schema:generate"]);
+    git.stage(root, readdirSync(root).filter(name => ![".git", ".codeforma", "node_modules", ".next"].includes(name)));
+    const sourceHead = git.commit(root, "Add a Section through the starter scaffold for installation acceptance");
+    assert.deepEqual(git.status(root), []);
+    const source = new SourcePreparation({ workDirectory: path.join(config.temporary, "preparation"), resolveAppRoot: () => root, nodePath: config.nodePath, pnpmCliPath: config.pnpmCliPath, gitExecutable: new GitToolchainResolver().resolveSystem().executablePath });
+    const input = { requestId: randomUUID(), appId: created.appId, expectedHead: sourceHead, pagePath: "/", replace: false };
+    const artifact = await source.prepare(input, new AbortController().signal, (step, message) => console.log(JSON.stringify({ step, message })));
+    const cover = await new PreviewCapture({ nodePath: config.nodePath, pnpmCliPath: config.pnpmCliPath }).capture(artifact, new AbortController().signal);
+    cpSync(cover, path.join(config.evidence, "new-app-cover.png"));
+    save("prepared-app.json", { input, sourceHead, sourceDirectory: artifact.sourceDirectory, verificationDirectory: artifact.verificationDirectory, files: artifact.files.map(({ path, sha256, size }) => ({ path, sha256, size })), cover, actualSourcePreparation: true, actualPreviewCapture: true, githubPublished: false, sectionGeneration: "Existing four-file scaffold, title instance and h1 adaptation; no LLM invoked" });
+    console.log("NEW_APP_PREPARATION_PASSED");
+  } finally { sqlite.close(); }
+}
+void run().then(() => app.exit(0), error => { save("preparation-error.json", { message: error.message, stack: error.stack }); console.error(error); app.exit(1); });

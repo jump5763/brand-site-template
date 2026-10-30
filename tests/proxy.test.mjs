@@ -72,6 +72,13 @@ test("Proxy resolves the Host, isolates internal routes and distinguishes absenc
     assert.equal(demo.headers.get("x-middleware-next"), "1");
   }
   assert.equal(requests.length, beforeInvalid);
+  const preview = await check("a.preview.localhost:3400", "/menu", 200);
+  assert.equal(new URL(preview.headers.get("x-middleware-rewrite")).pathname, "/preview/a/menu");
+  await check("missing.preview.localhost:3400", "/", 404);
+  await check("a.preview.localhost:3400", "/preview/b/menu", 404);
+  const health = await check("unknown.localhost:3400", "/healthz", 200);
+  assert.equal(health.headers.get("x-middleware-next"), "1");
+  assert.equal(requests.length, beforeInvalid);
   const errors = [];
   t.mock.method(console, "error", (...args) => errors.push(args.join(" ")));
   await check("c1.localhost", "/", 503);

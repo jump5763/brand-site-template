@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile, rm } from "node:fs/promises";
 import test from "node:test";
-import { normalizeHostname, publicPathname, resolveSiteRequest } from "../src/site-routing.mjs";
+import { normalizeHostname, publicPathname, resolveSiteRequest, resolvePreviewRequest } from "../src/site-routing.mjs";
 import { selectSites } from "../scripts/sample-sites.mjs";
 import { getBuildSites, sitesForTemplate } from "../src/server/build-input.mjs";
 import { validateSiteDocument as validateA } from "../src/templates/a/site-schema/runtime/validator.mjs";
@@ -49,6 +49,17 @@ test("public navigation strips both template and merchant segments", () => {
   assert.equal(publicPathname("/sites/ab/a1/menu"), "/sites/ab/a1/menu");
   assert.equal(publicPathname("/sites/a"), "/sites/a");
   assert.equal(publicPathname("/menu"), "/menu");
+  assert.equal(publicPathname("/preview/a/menu"), "/menu");
+  assert.equal(publicPathname("/preview/b"), "/");
+  assert.equal(publicPathname("/preview/unknown/menu"), "/preview/unknown/menu");
+});
+
+test("preview hosts stay inside their installed template and never enter merchant routes", () => {
+  assert.equal(resolvePreviewRequest("a.preview.localhost:3400", "/menu").pathname, "/preview/a/menu");
+  assert.equal(resolvePreviewRequest("b.preview.example:3400", "/sitemap.xml", "preview.example").pathname, "/preview/b/sitemap-data");
+  for (const pathname of ["/preview/b/menu", "/sites/a/a1/menu", "/%2e%2e/menu"]) assert.equal(resolvePreviewRequest("a.preview.localhost", pathname), null);
+  assert.equal(resolvePreviewRequest("unknown.preview.localhost", "/"), null);
+  assert.equal(resolveSiteRequest(identity("a1"), "/preview/a/menu"), null);
 });
 
 test("four independent sample documents use the owning template contract", async () => {

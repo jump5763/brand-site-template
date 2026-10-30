@@ -15,8 +15,25 @@ export function normalizeHostname(host) {
 
 /** Keep pathname-dependent UI identical before and after a host rewrite. */
 export function publicPathname(pathname) {
-  const match = pathname.match(/^\/sites\/([^/]+)\/[^/]+(?=\/|$)/);
-  return (match && templateIds.includes(match[1]) ? pathname.slice(match[0].length) : pathname) || "/";
+  const match = pathname.match(/^\/(?:sites\/([^/]+)\/[^/]+|preview\/([^/]+))(?=\/|$)/);
+  return (match && templateIds.includes(match[1] || match[2]) ? pathname.slice(match[0].length) : pathname) || "/";
+}
+
+export function resolvePreviewRequest(host, pathname, baseDomain = "preview.localhost") {
+  const hostname = normalizeHostname(host);
+  const suffix = `.${baseDomain}`;
+  if (!hostname.endsWith(suffix)) return null;
+  const templateId = hostname.slice(0, -suffix.length);
+  if (!templateIds.includes(templateId) || typeof pathname !== "string" || !pathname.startsWith("/")) return null;
+  let decoded;
+  try { decoded = decodeURIComponent(pathname); } catch { return null; }
+  if (/[\\\0]/.test(decoded) || decoded.split("/").some((part) => part === "." || part === "..")) return null;
+  const prefix = `/preview/${templateId}`;
+  if (decoded === "/sites" || decoded.startsWith("/sites/")) return null;
+  if (decoded === "/preview" || decoded.startsWith("/preview/")) {
+    return decoded === prefix || decoded.startsWith(`${prefix}/`) ? { templateId, pathname: decoded } : null;
+  }
+  return { templateId, pathname: prefix + (pathname === "/" ? "" : pathname === "/sitemap.xml" ? "/sitemap-data" : pathname) };
 }
 
 /** The caller supplies an API-verified identity; this module performs no I/O. */
@@ -26,6 +43,7 @@ export function resolveSiteRequest(site, pathname) {
   let decoded;
   try { decoded = decodeURIComponent(pathname); } catch { return null; }
   if (decoded.includes("\\") || decoded.includes("\0") || decoded.split("/").some((part) => part === "." || part === "..")) return null;
+  if (decoded === "/preview" || decoded.startsWith("/preview/")) return null;
   const prefix = `/sites/${site.templateId}/${site.siteId}`;
   if (decoded === "/sites" || decoded.startsWith("/sites/")) {
     return decoded === prefix || decoded.startsWith(`${prefix}/`) ? { site, pathname: decoded } : null;

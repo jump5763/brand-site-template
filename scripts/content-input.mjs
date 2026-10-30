@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import templateIds from "../src/template-ids.json" with { type: "json" };
 import { createSiteApi } from "../src/server/site-api.mjs";
 
 const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+const defaultSourceRoot = fileURLToPath(new URL("../", import.meta.url));
 
 export function normalizeScope(value = { scope: "all" }) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid publication scope");
@@ -18,12 +20,12 @@ export function normalizeScope(value = { scope: "all" }) {
 
 export const scopeLabel = (scope) => scope.scope === "all" ? "all" : scope.scope === "template" ? `template-${scope.templateId}` : scope.siteId;
 
-export function normalizeCatalog(entries, { allowEmpty = false } = {}) {
+export function normalizeCatalog(entries, { allowEmpty = false, registeredTemplates = templateIds } = {}) {
   if (!Array.isArray(entries) || (!allowEmpty && !entries.length)) throw new Error("Empty or invalid site catalog");
   const ids = new Set();
   const hosts = new Set();
   return entries.map((entry) => {
-    if (!entry || typeof entry.siteId !== "string" || !safeId.test(entry.siteId) || !templateIds.includes(entry.templateId)) throw new Error("Invalid site ID or unregistered template");
+    if (!entry || typeof entry.siteId !== "string" || !safeId.test(entry.siteId) || !registeredTemplates.includes(entry.templateId)) throw new Error("Invalid site ID or unregistered template");
     const url = new URL(entry.siteUrl);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
       throw new Error(`Invalid site URL: ${entry.siteId}`);
@@ -46,13 +48,14 @@ export async function readApiCatalog(baseUrl, token, requestedScope = { scope: "
   return catalog;
 }
 
-export async function validateDocuments(documents) {
+export async function validateDocuments(documents, { sourceRoot = defaultSourceRoot } = {}) {
+  const registered = JSON.parse(await readFile(path.join(sourceRoot, "src/template-ids.json"), "utf8"));
+  const { validateSiteInput } = await import(pathToFileURL(path.join(sourceRoot, "src/server/site-input.mjs")).href);
   await Promise.all(documents.map(async ({ config, document }) => {
-    if (!templateIds.includes(config.templateId)) throw new Error(`Unregistered template: ${config.templateId}`);
-    const { assertValidSiteDocument } = await import(`../src/templates/${config.templateId}/site-schema/runtime/validator.mjs`);
-    assertValidSiteDocument(document);
-    if (document.siteId !== config.id || new URL(document.siteUrl).hostname.toLowerCase().replace(/\.$/, "") !== config.hostname ||
-      (config.siteUrl && document.siteUrl !== config.siteUrl)) throw new Error(`Site identity mismatch: ${config.id}`);
+    if (!registered.includes(config.templateId)) throw new Error(`Unregistered template: ${config.templateId}`);
+    await validateSiteInput({ sourceRoot, templateId: config.templateId, document,
+      identity: { siteId: config.id, siteUrl: config.siteUrl || document.siteUrl, templateId: config.templateId } });
+    if (new URL(document.siteUrl).hostname.toLowerCase().replace(/\.$/, "") !== config.hostname) throw new Error(`Site identity mismatch: ${config.id}`);
   }));
   return documents;
 }
@@ -70,7 +73,34 @@ export async function readApiDocuments(baseUrl, selected, token) {
 export async function readLocalDocuments(root, selected) {
   return validateDocuments(await Promise.all(selected.map(async (config) => ({
     config, document: JSON.parse(await readFile(path.join(root, config.contentFile), "utf8")),
-  }))));
+  }))), { sourceRoot: root });
+}
+
+/** Read a job snapshot once, with validators and dependencies from that job's source. */
+export async function readFixedInput({ sourceRoot = defaultSourceRoot, inputDir, scope = { scope: "all" } }) {
+  if (!inputDir || !path.isAbsolute(inputDir)) throw new Error("--input-dir must be an absolute fixed input directory");
+  const registeredTemplates = JSON.parse(await readFile(path.join(sourceRoot, "src/template-ids.json"), "utf8"));
+  const raw = JSON.parse(await readFile(path.join(inputDir, "sites.json"), "utf8"));
+  if (!Array.isArray(raw) || raw.some((site) => site?.contentFile !== `sites/${site?.id}/current.json`)) throw new Error("Invalid fixed sites.json");
+  const catalog = normalizeCatalog(raw.map((site) => ({ ...site, siteId: site.id })), { allowEmpty: true, registeredTemplates });
+  if (catalog.some((site, index) => site.hostname !== raw[index].hostname)) throw new Error("Fixed input hostname mismatch");
+  const selected = selectCatalogScope(catalog, scope);
+  const documents = await readLocalDocumentsForInput(sourceRoot, inputDir, selected);
+  const { validateSiteInput } = await import(pathToFileURL(path.join(sourceRoot, "src/server/site-input.mjs")).href);
+  const previews = await Promise.all(registeredTemplates.map(async (templateId) => {
+    const document = JSON.parse(await readFile(path.join(inputDir, "previews", `${templateId}.json`), "utf8"));
+    await validateSiteInput({ sourceRoot, templateId, document, identity: { templateId, siteId: document.siteId, siteUrl: document.siteUrl } });
+    if (document.pages.some((page) => page.metadata.robots?.index !== false || page.metadata.robots?.follow !== false)) throw new Error(`Preview must be noindex: ${templateId}`);
+    return { templateId, document };
+  }));
+  if (!selected.length && !previews.length) throw new Error("No fixed site or preview targets");
+  return { catalog, selected, documents, previews };
+}
+
+async function readLocalDocumentsForInput(sourceRoot, inputDir, selected) {
+  return validateDocuments(await Promise.all(selected.map(async (config) => ({
+    config, document: JSON.parse(await readFile(path.join(inputDir, config.contentFile), "utf8")),
+  }))), { sourceRoot });
 }
 
 /** Only upload/inspection of this existing build uses its fixed input list. */

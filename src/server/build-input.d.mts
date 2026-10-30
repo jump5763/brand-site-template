@@ -9,3 +9,4 @@ export interface BuildSite {
 export function getBuildSites(root?: string): BuildSite[];
 export function sitesForTemplate(templateId: string, root?: string): BuildSite[];
 export function readBuildDocument(templateId: string, siteId: string, root?: string): Promise<unknown>;
+export function readPreviewDocument(templateId: string, root?: string): Promise<unknown>;
