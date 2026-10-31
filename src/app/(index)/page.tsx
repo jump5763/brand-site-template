@@ -8,7 +8,7 @@ export default function IndexPage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-20">
       <h1 className="text-3xl font-semibold">Brand Site 模板预览</h1>
-      <p className="mt-4 text-muted-foreground">两个独立模板，共用一个 Next.js 应用。公开站点请使用商家域名访问。</p>
+      <p className="mt-4 text-muted-foreground">模板由 Builder 安装并装配到运行包。公开站点请使用商家域名访问。</p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {sites.map((site) => (
           <DemoLink key={site.id} hostname={site.hostname}>

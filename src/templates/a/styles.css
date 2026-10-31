@@ -1,8 +1,0 @@
-@config "./tailwind.config.cjs";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-html[data-template="a"] { scroll-behavior: smooth; }
-html[data-template="a"] section[id], html[data-template="a"] [data-codeforma-layout-slot] { scroll-margin-top: 96px; }
-@media (prefers-reduced-motion: reduce) { html[data-template="a"] { scroll-behavior: auto; } }

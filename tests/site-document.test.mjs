@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createSiteDocumentReader } from "../src/server/site-document.mjs";
 import { readBuildDocument } from "../src/server/build-input.mjs";
 import { SiteApiError } from "../src/server/site-api.mjs";
-import { assertValidSiteDocument } from "../src/templates/a/site-schema/runtime/validator.mjs";
+const assertValidSiteDocument = (value) => { assert.ok(Array.isArray(value.pages)); return value; };
 
-const source = () => readFile(new URL("../sites/a1/current.json", import.meta.url), "utf8").then(JSON.parse);
+const source = () => ({ siteId: "a1", siteUrl: "http://a1.localhost", pages: [{ path: "/" }] });
 
 test("build reads only its fixed snapshot without revalidation or API fallback", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "site-document-test-"));

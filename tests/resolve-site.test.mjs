@@ -15,7 +15,7 @@ test("normalized hostname lookups merge and positive TTL does not slide on hits"
   let time = 0;
   const calls = [];
   const waiting = deferred();
-  const resolve = createSiteResolver({ now: () => time, positiveTtlMs: 30, lookup: (host) => {
+  const resolve = createSiteResolver({ installedTemplates: ["a", "b"], now: () => time, positiveTtlMs: 30, lookup: (host) => {
     calls.push(host);
     return calls.length === 1 ? waiting.promise : Promise.resolve(null);
   } });
@@ -39,7 +39,7 @@ test("explicit absence expires quickly and a new public merchant is discoverable
   let time = 0;
   let value = null;
   let calls = 0;
-  const resolve = createSiteResolver({ now: () => time, negativeTtlMs: 5,
+  const resolve = createSiteResolver({ installedTemplates: ["a", "b"], now: () => time, negativeTtlMs: 5,
     lookup: async () => { calls++; return value; } });
   assert.equal(await resolve("a3.example.com"), null);
   value = identity("a3");
@@ -53,7 +53,7 @@ test("explicit absence expires quickly and a new public merchant is discoverable
 
 test("bounded LRU evicts the least recently used positive or negative entry", async () => {
   const calls = [];
-  const resolve = createSiteResolver({ capacity: 2, lookup: async (host) => {
+  const resolve = createSiteResolver({ installedTemplates: ["a", "b"], capacity: 2, lookup: async (host) => {
     calls.push(host);
     return host === "unknown.example.com" ? null : identity(host.split(".")[0]);
   } });
@@ -70,7 +70,7 @@ test("expired identities fail closed and rejected queries are released for retry
   let value = identity();
   let failure;
   let calls = 0;
-  const resolve = createSiteResolver({ now: () => time, positiveTtlMs: 30, lookup: async () => {
+  const resolve = createSiteResolver({ installedTemplates: ["a", "b"], now: () => time, positiveTtlMs: 30, lookup: async () => {
     calls++;
     if (failure) throw failure;
     return value;
@@ -91,7 +91,7 @@ test("expired identities fail closed and rejected queries are released for retry
 
 test("unknown templates fail without negative caching; malformed hosts never query API", async () => {
   let calls = 0;
-  const resolve = createSiteResolver({ lookup: async () => { calls++; return identity("a1", "future"); } });
+  const resolve = createSiteResolver({ installedTemplates: ["a", "b"], lookup: async () => { calls++; return identity("a1", "future"); } });
   await assert.rejects(resolve("a1.example.com"), /Template is not installed/);
   await assert.rejects(resolve("a1.example.com"), /Template is not installed/);
   assert.equal(calls, 2);

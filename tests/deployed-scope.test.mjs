@@ -25,12 +25,12 @@ test("deployed capability has no merchant or concrete-page admission list", asyn
   assert.deepEqual(baseline.templates, ["a", "b"]);
   assert.equal("catalog" in baseline, false);
   assert.equal("pagePaths" in baseline, false);
-  assert.deepEqual(validateDeployedCapabilities({ baseline, selected: [{ id: "a3", templateId: "a" }], scope: { scope: "site", siteId: "a3" }, env: {} }), baseline.buildEnv);
-  assert.deepEqual(validateDeployedCapabilities({ baseline, selected: [], scope: { scope: "template", templateId: "a" }, env: {} }), baseline.buildEnv);
-  assert.throws(() => validateDeployedCapabilities({ baseline, selected: [], scope: { scope: "template", templateId: "c" }, env: {} }), /not installed/);
-  assert.throws(() => validateDeployedCapabilities({ baseline, selected: [{ id: "c1", templateId: "c" }], scope: { scope: "all" }, env: {} }), /not installed/);
+  assert.deepEqual(validateDeployedCapabilities({ registeredTemplates: ["a", "b"], baseline, selected: [{ id: "a3", templateId: "a" }], scope: { scope: "site", siteId: "a3" }, env: {} }), baseline.buildEnv);
+  assert.deepEqual(validateDeployedCapabilities({ registeredTemplates: ["a", "b"], baseline, selected: [], scope: { scope: "template", templateId: "a" }, env: {} }), baseline.buildEnv);
+  assert.throws(() => validateDeployedCapabilities({ registeredTemplates: ["a", "b"], baseline, selected: [], scope: { scope: "template", templateId: "c" }, env: {} }), /not installed/);
+  assert.throws(() => validateDeployedCapabilities({ registeredTemplates: ["a", "b"], baseline, selected: [{ id: "c1", templateId: "c" }], scope: { scope: "all" }, env: {} }), /not installed/);
   for (const [name, value] of Object.entries({ STATIC_ASSET_PREFIX: "wrong", SEARCH_INDEXING_ENABLED: "true" })) {
-    assert.throws(() => validateDeployedCapabilities({ baseline, selected: [], scope: { scope: "all" }, env: { [name]: value } }), /differs from deployed application/);
+    assert.throws(() => validateDeployedCapabilities({ registeredTemplates: ["a", "b"], baseline, selected: [], scope: { scope: "all" }, env: { [name]: value } }), /differs from deployed application/);
   }
 });
 

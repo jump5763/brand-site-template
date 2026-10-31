@@ -18,6 +18,8 @@ async function fixture(t) {
   }, entryCSSFiles: { "/build/src/app/sites/a/[siteId]/layout": [{ path: "static/css/a.css" }] } };
   const save = async (file, body) => { await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, body); };
   await Promise.all([
+    save(path.join(options.appDir, "src/template-ids.json"), JSON.stringify(["a"])),
+    ...["a1", "a2"].map((id) => save(path.join(options.appDir, "sites", id, "current.json"), JSON.stringify({ pages: [{ path: "/" }, { path: "/menu" }] }))),
     save(path.join(options.appDir, ".next", pageKey), "{101:()=>{}}"),
     save(path.join(options.appDir, ".next/static/css/a.css"), ".a{color:red}"),
     save(path.join(options.appDir, "build-input/sites.json"), JSON.stringify([{ id: "a1", templateId: "a" }, { id: "a2", templateId: "a" }])),

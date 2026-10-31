@@ -3,17 +3,14 @@ import assert from "node:assert/strict";
 import { readFile, lstat, writeFile, mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { selectSites, sites } from "./sample-sites.mjs";
-import templateIds from "../src/template-ids.json" with { type: "json" };
 import { checkResourceOwnership, evidenceSummary, filesAt, readBuildEvidence, resourceLocation } from "./resource-audit.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
 export async function inspectBuild(options) {
   const { scope = "all", appDir: dir, artifactDir, assetPrefix, traceDir } = options;
-  let catalog;
-  try { catalog = JSON.parse(await readFile(path.join(dir, "build-input/sites.json"), "utf8")); }
-  catch (error) { if (error.code !== "ENOENT") throw error; catalog = selectSites(scope); }
+  const catalog = JSON.parse(await readFile(path.join(dir, "build-input/sites.json"), "utf8"));
+  const templateIds = JSON.parse(await readFile(path.join(dir, "src/template-ids.json"), "utf8"));
   const selected = scope === "all" ? catalog : catalog.filter((site) => site.id === scope);
   assert.ok(selected.length, `No sites in application for scope: ${scope}`);
   const [files, evidence, traces] = await Promise.all([filesAt(dir), readBuildEvidence(traceDir), filesAt(traceDir)]);
@@ -36,7 +33,7 @@ export async function inspectBuild(options) {
 
   const pages = [];
   for (const file of files) {
-    const match = file.match(/\/server\/app\/sites\/([^/]+)\/([^/.]+)(\/menu)?\.html$/);
+    const match = file.match(/\/server\/app\/sites\/([^/]+)\/([^/.]+)(\/.*)?\.html$/);
     if (!match || !templateIds.includes(match[1])) continue;
     const html = await readFile(file, "utf8");
     const [, template, siteId, suffix = ""] = match;
@@ -67,22 +64,19 @@ export async function inspectBuild(options) {
     return match && templateIds.includes(match[1]) && !templates.includes(match[1]);
   });
   const foreignData = files.map((file) => path.relative(dir, file)).filter((file) => /^sites\/([^/]+)\/current\.json$/.test(file) && !expectedSites.includes(file.match(/^sites\/([^/]+)\//)[1]));
-  const runtimeText = (await Promise.all(files.filter((file) => !file.includes(`${path.sep}node_modules${path.sep}`) && /\.(js|json|html|rsc)$/.test(file)).map((file) => readFile(file, "utf8")))).join("\n");
-  const foreignContent = [];
-  for (const site of sites.filter((site) => !expectedSites.includes(site.id))) {
-    const document = JSON.parse(await readFile(path.join(root, site.contentFile), "utf8"));
-    if (runtimeText.includes(document.pages[0].sections[0].content.title)) foreignContent.push(site.id);
-  }
   const foreignTemplateModules = evidence.modules.filter((module) => !templates.includes(module.template));
-  const expectedPages = selected.flatMap((site) => ["/", "/menu"].map((route) => `${site.templateId}:${site.id}:${route}`)).sort();
+  const expectedPages = (await Promise.all(selected.map(async (site) => {
+    const document = JSON.parse(await readFile(path.join(dir, "sites", site.id, "current.json"), "utf8"));
+    return document.pages.map((page) => `${site.templateId}:${site.id}:${page.path}`);
+  }))).flat().sort();
   const actualPages = pages.map((page) => `${page.template}:${page.siteId}:${page.path}`).sort();
-  const passed = JSON.stringify(actualPages) === JSON.stringify(expectedPages) && !badCachePaths.length && !outsideLinks.length && !historyTracePaths.length && !foreignSchemas.length && !foreignData.length && !foreignContent.length && !foreignTemplateModules.length && !foreignCatalog.length && [...tracedSiteFiles].every((id) => expectedSites.includes(id));
+  const passed = JSON.stringify(actualPages) === JSON.stringify(expectedPages) && !badCachePaths.length && !outsideLinks.length && !historyTracePaths.length && !foreignSchemas.length && !foreignData.length && !foreignTemplateModules.length && !foreignCatalog.length && [...tracedSiteFiles].every((id) => expectedSites.includes(id));
   return {
     scope, passed, checkedAt: new Date().toISOString(), inputs: options, evidence: evidenceSummary(evidence),
     staticFiles: staticFiles.length, staticBytes: staticSizes.reduce((sum, size) => sum + size, 0),
     deploymentBytes: [...sizes.values()].reduce((sum, value) => sum + value, 0),
     templateModules: evidence.modules, pages, expectedPages, actualPages,
-    badCachePaths, outsideLinks, historyTracePaths, foreignSchemas, foreignData, foreignContent, foreignTemplateModules, foreignCatalog,
+    badCachePaths, outsideLinks, historyTracePaths, foreignSchemas, foreignData, foreignTemplateModules, foreignCatalog,
     // Content JSON is a build input; the online loader must not regenerate pages.
     tracedSiteFiles: [...tracedSiteFiles], contentTracing: "Only unexpected merchant data is rejected; dynamic build inputs need not be traced",
   };

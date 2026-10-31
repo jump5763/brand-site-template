@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after } from "node:test";
 import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import Cache from "../cache-handler.cjs";
+import { createRequire } from "node:module";
+import { sourceFixture } from "./helpers/source-fixture.mjs";
+const source = await sourceFixture({ after });
+await fs.copyFile(new URL("../cache-handler.cjs", import.meta.url), path.join(source.root, "cache-handler.cjs"));
+await fs.symlink(path.resolve("node_modules"), path.join(source.root, "node_modules"), "dir");
+const Cache = createRequire(import.meta.url)(path.join(source.root, "cache-handler.cjs"));
 import nodeFsModule from "next/dist/server/lib/node-fs-methods.js";
 
 const { nodeFs } = nodeFsModule;

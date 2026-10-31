@@ -1,54 +1,55 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, writeFile, rm, access } from "node:fs/promises";
+import { mkdtemp, mkdir, cp, readFile, writeFile, rm, access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { initializeContent, createContentServer, createArtifactServer, listen } from "../scripts/local-services.mjs";
-import { readApiCatalog, readApiDocuments, normalizeCatalog } from "../scripts/content-input.mjs";
+import { createContentServer } from "./helpers/content-server.mjs";
+import { createArtifactServer, listen } from "../scripts/local-services.mjs";
+import { installedTemplate } from "./helpers/installed-template.mjs";
+import { pathToFileURL } from "node:url";
 import { prepareWorkspace } from "../scripts/prepare.mjs";
 import { put } from "./helpers/artifacts.mjs";
 
 const close = (server) => new Promise((resolve) => server.close(resolve));
 
-test("API snapshot stays fixed, validates identities and retains full code for selective SSG", async (t) => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "content-test-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initializeContent(root);
+test("API snapshot stays fixed and uses the installed template contract", async (t) => {
+  const fixture = await installedTemplate(t, { merchant: true });
+  const { sourceRoot, document, config } = fixture;
+  await cp(new URL("../scripts", import.meta.url), path.join(sourceRoot, "scripts"), { recursive: true });
+  const { readApiCatalog, readApiDocuments, normalizeCatalog } = await import(pathToFileURL(path.join(sourceRoot, "scripts/content-input.mjs")).href);
+  const dataDir = path.join(fixture.root, "api");
+  await mkdir(dataDir);
+  await writeFile(path.join(dataDir, "catalog.json"), JSON.stringify({ sites: [{ siteId: config.id, templateId: config.templateId, siteUrl: config.siteUrl, public: true }] }));
+  const filename = path.join(dataDir, `${config.id}.json`);
+  await writeFile(filename, JSON.stringify(document));
   const requests = [];
-  const server = createContentServer({ dataDir: root, token: "test-only", onRequest: (...args) => requests.push(args) });
+  const server = createContentServer({ dataDir, token: "test-only", onRequest: (...args) => requests.push(args) });
   const port = await listen(server, 0);
   t.after(() => close(server));
   const base = `http://127.0.0.1:${port}`;
   await assert.rejects(readApiCatalog(base), /401/);
   const catalog = await readApiCatalog(base, "test-only");
-  assert.equal(catalog.length, 4);
-  const docs = await readApiDocuments(base, [catalog[0]], "test-only");
-  const originalTitle = docs[0].document.pages[0].metadata.title;
-  const changed = structuredClone(docs[0].document);
+  const docs = await readApiDocuments(base, catalog, "test-only");
+  const changed = structuredClone(document);
   changed.pages[0].metadata.title = "later edit";
-  await writeFile(path.join(root, "a1.json"), JSON.stringify(changed));
-  await initializeContent(root);
-  assert.equal(JSON.parse(await readFile(path.join(root, "a1.json"), "utf8")).pages[0].metadata.title, "later edit");
-  const work = await prepareWorkspace(process.cwd(), [catalog[0]], { catalog, documents: docs, completeTemplates: true });
+  await writeFile(filename, JSON.stringify(changed));
+  const work = await prepareWorkspace(sourceRoot, catalog, { documents: docs, completeTemplates: true });
   t.after(() => rm(work, { recursive: true, force: true }));
-  assert.equal(JSON.parse(await readFile(path.join(work, "sites/a1/current.json"), "utf8")).pages[0].metadata.title, originalTitle);
-  assert.equal(JSON.parse(await readFile(path.join(work, "build-input/sites.json"), "utf8")).length, 1);
-  await access(path.join(work, "src/app/sites/b/[siteId]/layout.tsx"));
-  await assert.rejects(access(path.join(work, "sites/a2")), { code: "ENOENT" });
-  assert.equal(requests.filter(([, url]) => url === "/sites/a1/content").length, 1);
-  changed.siteId = "a2";
-  await writeFile(path.join(root, "a1.json"), JSON.stringify(changed));
-  await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), /identity mismatch/);
-  await writeFile(path.join(root, "a1.json"), JSON.stringify({ siteId: "a1", siteUrl: catalog[0].siteUrl }));
-  await assert.rejects(readApiDocuments(base, [catalog[0]], "test-only"), (error) => error.status === 422 && error.diagnostics.length > 0);
-  assert.equal((await fetch(`${base}/sites/nope/content`, { headers: { Authorization: "Bearer test-only" } })).status, 404);
-  for (const entry of [
-    [{ templateId: "a", siteUrl: "http://a.localhost" }],
-    [{ siteId: 1, templateId: "a", siteUrl: "http://a.localhost" }],
-    [{ siteId: "../x", templateId: "a", siteUrl: "http://a.localhost" }],
-    [{ siteId: "a1", templateId: "x", siteUrl: "http://a.localhost" }],
-    [{ siteId: "a1", templateId: "a", siteUrl: "http://a.localhost" }, { siteId: "a2", templateId: "b", siteUrl: "http://a.localhost" }],
-  ]) assert.throws(() => normalizeCatalog(entry));
+  assert.equal(JSON.parse(await readFile(path.join(work, config.contentFile), "utf8")).pages[0].metadata.title, document.pages[0].metadata.title);
+  await access(path.join(work, "src/app/sites/template-a/[siteId]/layout.tsx"));
+  await assert.rejects(access(path.join(work, "src/site-catalog.json")), { code: "ENOENT" });
+  assert.equal(requests.filter(([, url]) => url === `/sites/${config.id}/content`).length, 1);
+  changed.siteId = "other";
+  await writeFile(filename, JSON.stringify(changed));
+  await assert.rejects(readApiDocuments(base, catalog, "test-only"), /identity mismatch/);
+  await writeFile(filename, JSON.stringify({ siteId: config.id, siteUrl: config.siteUrl }));
+  await assert.rejects(readApiDocuments(base, catalog, "test-only"), (error) => error.status === 422 && error.diagnostics.length > 0);
+  for (const entries of [
+    [{ templateId: "template-a", siteUrl: config.siteUrl }],
+    [{ siteId: "../x", templateId: "template-a", siteUrl: config.siteUrl }],
+    [{ siteId: config.id, templateId: "uninstalled", siteUrl: config.siteUrl }],
+    [config, config].map((site) => ({ ...site, siteId: site.id })),
+  ]) assert.throws(() => normalizeCatalog(entries));
 });
 
 test("artifact HTTP serves encoded chunks, HEAD metadata and rejects traversal", async (t) => {

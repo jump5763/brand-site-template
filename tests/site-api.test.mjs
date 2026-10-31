@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile, rm, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createSiteApi, SiteApiError } from "../src/server/site-api.mjs";
-import { initializeContent, createContentServer, listen } from "../scripts/local-services.mjs";
+import { initializeContent, createContentServer, listen } from "./helpers/content-server.mjs";
 
 async function fixture(t) {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), "site-api-test-"));

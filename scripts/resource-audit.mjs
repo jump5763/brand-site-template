@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import templateIds from "../src/template-ids.json" with { type: "json" };
 
 export async function filesAt(base) {
   const entries = await readdir(base, { withFileTypes: true });
@@ -46,7 +45,7 @@ export async function readBuildEvidence(traceDir) {
   for (const { manifest } of manifests) {
     for (const [source, entry] of Object.entries(manifest.clientModules)) {
       const match = source.match(/\/src\/templates\/([^/]+)\/(.+)/);
-      if (match && templateIds.includes(match[1])) modules.set(`${match[1]}:${entry.id}`, { template: match[1], source: match[2], id: entry.id });
+      if (match) modules.set(`${match[1]}:${entry.id}`, { template: match[1], source: match[2], id: entry.id });
     }
   }
   assert.ok(modules.size, `No template module evidence: ${traceDir}`);

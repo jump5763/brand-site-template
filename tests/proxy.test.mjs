@@ -4,11 +4,13 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { sourceFixture } from "./helpers/source-fixture.mjs";
 import ts from "typescript";
 import { NextRequest } from "next/server.js";
-import { initializeContent, createContentServer, listen } from "../scripts/local-services.mjs";
+import { initializeContent, createContentServer, listen } from "./helpers/content-server.mjs";
 
 test("Proxy resolves the Host, isolates internal routes and distinguishes absence from API failure", async (t) => {
+  const fixture = await sourceFixture(t);
   const directory = await mkdtemp(path.join(os.tmpdir(), "brand-proxy-test-"));
   const dataDir = path.join(directory, "data");
   await initializeContent(dataDir, { siteIds: ["a1", "b1"] });
@@ -36,7 +38,7 @@ test("Proxy resolves the Host, isolates internal routes and distinguishes absenc
   const source = await readFile(new URL("../src/proxy.ts", import.meta.url), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
     .replace('"next/server"', JSON.stringify(pathToFileURL(path.resolve("node_modules/next/server.js")).href))
-    .replace(/"(\.\/[^\"]+)"/g, (_, relative) => JSON.stringify(new URL(`../src/${relative.slice(2)}`, import.meta.url).href));
+    .replace(/"(\.\/[^\"]+)"/g, (_, relative) => JSON.stringify(pathToFileURL(path.join(fixture.root, "src", relative.slice(2))).href));
   const entry = path.join(directory, "proxy.mjs");
   await writeFile(entry, code);
   const { proxy } = await import(pathToFileURL(entry).href);

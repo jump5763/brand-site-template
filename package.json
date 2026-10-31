@@ -17,7 +17,6 @@
     "test": "node --test tests/*.test.mjs",
     "publish": "node scripts/sites.mjs publish",
     "upload": "node scripts/sites.mjs upload",
-    "local:services": "node scripts/local-services.mjs",
     "local:stack": "node --env-file=.env.local scripts/local-stack.mjs"
   },
   "dependencies": {

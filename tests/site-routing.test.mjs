@@ -1,15 +1,9 @@
 import assert from "node:assert/strict";
-import { access, readFile, rm } from "node:fs/promises";
-import test from "node:test";
-import { normalizeHostname, publicPathname, resolveSiteRequest, resolvePreviewRequest } from "../src/site-routing.mjs";
-import { selectSites } from "../scripts/sample-sites.mjs";
-import { getBuildSites, sitesForTemplate } from "../src/server/build-input.mjs";
-import { validateSiteDocument as validateA } from "../src/templates/a/site-schema/runtime/validator.mjs";
-import { validateSiteDocument as validateB } from "../src/templates/b/site-schema/runtime/validator.mjs";
-import { prepareWorkspace } from "../scripts/prepare.mjs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import test, { after } from "node:test";
+import { sourceFixture } from "./helpers/source-fixture.mjs";
+const fixture = await sourceFixture({ after });
+const { normalizeHostname, publicPathname, resolveSiteRequest, resolvePreviewRequest } = await fixture.load("src/site-routing.mjs");
 
-const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const identity = (siteId) => ({ siteId, templateId: siteId[0], siteUrl: `http://${siteId}.localhost` });
 
 test("API-verified identities route without a source merchant catalog", () => {
@@ -62,31 +56,9 @@ test("preview hosts stay inside their installed template and never enter merchan
   assert.equal(resolveSiteRequest(identity("a1"), "/preview/a/menu"), null);
 });
 
-test("four independent sample documents use the owning template contract", async () => {
-  const docs = await Promise.all(["a1", "a2", "b1", "b2"].map(async (id) => JSON.parse(await readFile(new URL(`../sites/${id}/current.json`, import.meta.url), "utf8"))));
-  for (const doc of docs) assert.equal((doc.siteId[0] === "a" ? validateA : validateB)(doc).valid, true);
-  assert.equal(validateA(docs[2]).valid, false);
-  assert.equal(validateB(docs[0]).valid, false);
-  assert.notEqual(docs[0].pages[0].metadata.title, docs[1].pages[0].metadata.title);
-  assert.notEqual(docs[2].theme.colors.primary, docs[3].theme.colors.primary);
-});
 
-test("clean preparation uses fixed files and excludes unrelated sample data and old outputs", async () => {
-  const work = await prepareWorkspace(projectRoot, selectSites("a1"));
-  try {
-    await access(`${work}/src/app/sites/a/[siteId]/layout.tsx`);
-    await access(`${work}/src/templates/a/site-schema/generated/site-schema.json`);
-    await access(`${work}/src/server/site-document.mjs`);
-    for (const relative of ["src/site-catalog.json", "src/templates/b", "src/app/sites/b", "sites/a2", "sites/b1", ".next", ".next-a", ".next-b", "dist", "node_modules"]) {
-      await assert.rejects(access(`${work}/${relative}`), { code: "ENOENT" });
-    }
-    assert.deepEqual(getBuildSites(work).map((site) => site.id), ["a1"]);
-    assert.deepEqual(sitesForTemplate("b", work), []);
-    assert.deepEqual(JSON.parse(await readFile(`${work}/src/template-ids.json`, "utf8")), ["a"]);
-    const routing = await import(pathToFileURL(`${work}/src/site-routing.mjs`).href);
-    assert.equal(routing.publicPathname("/sites/a/a1/menu"), "/menu");
-    assert.equal(routing.resolveSiteRequest(identity("a1"), "/menu").pathname, "/sites/a/a1/menu");
-    assert.equal(JSON.parse(await readFile(`${work}/sites/a1/current.json`, "utf8")).siteId, "a1");
-    await assert.rejects(access(`${work}/src/site-data.ts`), { code: "ENOENT" });
-  } finally { await rm(work, { recursive: true, force: true }); }
+test("bare host has no installed templates", async () => {
+  const host = await import("../src/site-routing.mjs");
+  assert.equal(host.resolveSiteRequest(identity("a1"), "/"), null);
+  assert.equal(host.resolvePreviewRequest("a.preview.localhost", "/"), null);
 });
