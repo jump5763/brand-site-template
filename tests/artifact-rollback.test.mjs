@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { publishFiles } from "../scripts/publish-files.mjs";
 import { probePublication } from "../scripts/local-jobs.mjs";
-import { readArtifactPublication, restoreArtifactPointer, rollbackSiteArtifact } from "../scripts/jobs/rollback-site-artifact.mjs";
+import { readArtifactPublication, rollbackSiteArtifact } from "../scripts/jobs/rollback-site-artifact.mjs";
 import { seedArtifacts } from "./helpers/artifacts.mjs";
 
 async function fixture(t) {
@@ -15,8 +15,8 @@ async function fixture(t) {
   const artifactDir = path.join(root, "artifacts");
   const nextDir = path.join(root, "next");
   const site = { merchantId: "merchant-a", siteId: "site-a", templateId: "template-a", state: "ACTIVE",
-    publishRequestId: "newer-pending-content", publishPending: true, document: { title: "saved later" } };
-  const options = { artifactDir, nextDir, runtimeId: "runtime-a", sites: [{ id: site.siteId, templateId: site.templateId }] };
+    contentRevision: "newer-saved-content", document: { title: "saved later" } };
+  const options = { artifactDir, nextDir, runtimeId: "runtime-a", sites: [{ id: site.siteId, templateId: site.templateId, contentRevision: "published-revision" }] };
   for (const publishId of ["old-publication", "current-publication"]) {
     const prefix = await seedArtifacts(nextDir, { id: site.siteId, templateId: site.templateId, value: publishId });
     await writeFile(path.join(nextDir, `server/app/${prefix}.html`), `<main data-site-id="${site.siteId}">${publishId}</main><script src="/_next/static/test.js"></script><link href="/_next/static/test.css" rel="stylesheet">`);
@@ -25,12 +25,10 @@ async function fixture(t) {
   const siteDir = path.join(artifactDir, "runtimes/runtime-a/sites/template-a/site-a");
   const pointer = path.join(siteDir, "current.json");
   const before = await readFile(pointer);
-  const job = { _id: "new-rollback-job", kind: "ROLLBACK_SITE_ARTIFACT", target: {
-    merchantId: site.merchantId, siteId: site.siteId, templateId: site.templateId, runtimeId: "runtime-a",
-    expectedCurrentPublishId: "current-publication", targetPublishId: "old-publication", targetJobId: "old-publication-job",
-  }, input: { sites: [site], runtime: { runtimeId: "runtime-a", templateSources: { "template-a": {} } } } };
+  const job = { _id: "new-rollback-execution", kind: "ROLLBACK_SITE_ARTIFACT", target: { merchantId: site.merchantId },
+    input: { sites: [site], runtime: { runtimeId: "runtime-a", templateSources: { "template-a": {} } } } };
   const context = { job, artifactDir, jobDir: path.join(root, "jobs", job._id), runtimeId: "runtime-a", publications: [], previousPublishIds: {},
-    merchantResults: [{ merchantId: site.merchantId, siteId: site.siteId, templateId: site.templateId, publishRequestId: site.publishRequestId }],
+    merchantResults: [{ merchantId: site.merchantId, siteId: site.siteId, templateId: site.templateId, contentRevision: site.contentRevision }],
     async progress() {},
     recordPublications(publications) {
       this.publications = publications;
@@ -72,11 +70,14 @@ test("artifact rollback reuses complete old publication, verifies real local HTT
   const result = await rollbackSiteArtifact(context);
   assert.equal(result.status, "SUCCEEDED");
   assert.equal(result.merchantResults[0].publishId, "old-publication");
-  assert.equal(result.merchantResults[0].publishRequestId, "newer-pending-content");
+  assert.equal(result.merchantResults[0].contentRevision, "newer-saved-content");
   assert.deepEqual(result.previousPublishIds, { "site-a": "current-publication" });
   assert.equal(observation.routes.length, 4);
   assert.equal(observation.assets.length, 2);
-  assert.equal(JSON.parse(await readFile(pointer)).jobId, "old-publication-job");
+  const pointerFact = JSON.parse(await readFile(pointer));
+  assert.equal(pointerFact.jobId, "old-publication-job");
+  assert.equal(pointerFact.contentRevision, "published-revision");
+  assert.deepEqual(pointerFact.previous, { publishId: "current-publication", jobId: "current-publication-job", contentRevision: "published-revision" });
   assert.deepEqual(context.job.input, original);
 });
 
@@ -89,34 +90,23 @@ test("HTTP verification failure restores the exact original pointer", async (t) 
   assert.equal(context.merchantResults[0].verified, false);
 });
 
-test("stop during verification retains the pointer and original evidence for restart", async (t) => {
-  const { context, pointer, before } = await fixture(t);
+test("stop during verification retains published facts without creating recovery records", async (t) => {
+  const { context, pointer } = await fixture(t);
   const stopping = Object.assign(new Error("Stop requested"), { code: "STOP_REQUESTED", awaitingConfirmation: true });
   context.verifySites = async () => { throw stopping; };
   await assert.rejects(rollbackSiteArtifact(context), (error) => error === stopping);
-  assert.equal(JSON.parse(await readFile(pointer)).publishId, context.job.target.targetPublishId);
-  assert.deepEqual(JSON.parse(await readFile(path.join(context.jobDir, "artifact-before.json"))).pointer, JSON.parse(before));
+  assert.equal(JSON.parse(await readFile(pointer)).publishId, "old-publication");
+  assert.equal(JSON.parse(await readFile(pointer)).previous.publishId, "current-publication");
 });
 
-test("failed pointer restoration stays unconfirmed and manual recovery uses the recorded original publication", async (t) => {
-  const { context, pointer, before, identity } = await fixture(t);
+test("failed immediate restoration reports an uncertain pointer without a persistent recovery workflow", async (t) => {
+  const { context, pointer } = await fixture(t);
   context.verifySites = async () => {
-    const candidate = JSON.parse(await readFile(pointer));
-    await writeFile(pointer, JSON.stringify({ ...candidate, publishId: "unexpected-pointer" }));
+    await writeFile(pointer, JSON.stringify({ ...JSON.parse(await readFile(pointer)), publishId: "unexpected-pointer" }));
     throw new Error("HTTP identity mismatch");
   };
-  await assert.rejects(rollbackSiteArtifact(context), (error) => error instanceof AggregateError && error.errors.length === 2 &&
-    error.code === "STATE_UNCONFIRMED" && error.awaitingConfirmation === true);
-  const record = JSON.parse(await readFile(path.join(context.jobDir, "artifact-before.json")));
-  assert.equal(record.jobId, context.job._id);
-  assert.deepEqual(record.pointer, JSON.parse(before));
-  const options = { ...identity, expectedPublishId: context.job.target.targetPublishId, expectedJobId: context.job.target.targetJobId,
-    publishId: record.pointer.publishId, jobId: record.pointer.jobId };
-  await assert.rejects(restoreArtifactPointer(options), /pointer changed/);
-  await writeFile(pointer, JSON.stringify(context.publications[0].current));
-  assert.equal((await restoreArtifactPointer(options)).current.publishId, record.pointer.publishId);
-  assert.deepEqual(await readFile(pointer), before);
-  assert.equal((await restoreArtifactPointer(options)).current.publishId, record.pointer.publishId);
+  await assert.rejects(rollbackSiteArtifact(context), (error) => error instanceof AggregateError && error.code === "STATE_UNCONFIRMED");
+  assert.equal(JSON.parse(await readFile(pointer)).publishId, "unexpected-pointer");
 });
 
 test("rollback rejects generation, template, current pointer and incomplete release before mutation", async (t) => {
@@ -124,9 +114,14 @@ test("rollback rejects generation, template, current pointer and incomplete rele
     await t.test(scenario, async (t) => {
       const { context, siteDir, pointer, before } = await fixture(t);
       const release = path.join(siteDir, "releases/old-publication");
-      if (scenario === "runtime") context.job.target.runtimeId = "other-runtime";
-      if (scenario === "template") context.job.target.templateId = "other-template";
-      if (scenario === "current") context.job.target.expectedCurrentPublishId = "unconfirmed-publication";
+      if (scenario === "runtime") context.runtimeId = "other-runtime";
+      if (scenario === "template") context.site = context.job.input.sites[0] = { ...context.job.input.sites[0], templateId: "other-template" };
+      if (scenario === "current") {
+        const current = JSON.parse(before); current.previous = null;
+        await writeFile(pointer, JSON.stringify(current));
+        await assert.rejects(rollbackSiteArtifact(context), /No previous complete publication/);
+        return;
+      }
       if (scenario === "manifest") {
         const filename = path.join(release, "manifest.json");
         const manifest = JSON.parse(await readFile(filename));

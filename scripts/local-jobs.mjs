@@ -1,4 +1,3 @@
-import { setTimeout as sleep } from "node:timers/promises";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
@@ -23,7 +22,6 @@ const saveJson = async (filename, value) => { await mkdir(path.dirname(filename)
 const diagnostic = (error) => ({ code: error.code || "JOB_FAILED", message: error.message,
   ...(error.diagnostics ? { diagnostics: error.diagnostics } : {}),
   ...(error instanceof AggregateError ? { errors: error.errors.map(diagnostic) } : {}) });
-const transient = (error) => !error.awaitingConfirmation && (!error.status || error.status >= 500);
 
 export function createBusinessApi({ baseUrl, timeoutMs = 30_000 }) {
   const base = new URL(baseUrl);
@@ -172,42 +170,23 @@ async function snapshotHash(root) {
   return createHash("sha256").update(hashes.join("")).digest("hex");
 }
 
-async function confirmResult(context, result) {
-  const { api, job, delay, logger } = context;
-  while (true) {
-    try { return await api("POST", `/internal/site-jobs/${job._id}/complete`, result); }
-    catch (error) {
-      if (error.awaitingConfirmation) throw error;
-      logger.error(`Completion pending: ${job._id}; ${error.message}`);
-      try {
-        const [record, environment] = await Promise.all([api("GET", `/site-jobs/${job._id}`), api("GET", "/site-runtime")]);
-        if (["SUCCEEDED", "FAILED", "SKIPPED"].includes(record.status)) {
-          if (record.status === result.status || record.status === "SUCCEEDED") return record;
-          throw Object.assign(new Error(`Job ${job._id} has a conflicting terminal result`), { status: 409 });
-        }
-        logger.log(`Confirmation observed: ${job._id}; ${record.status}; active=${environment.activeRuntimeJobId ?? "none"}`);
-        if (!transient(error)) throw error;
-      } catch (readError) {
-        if (readError.awaitingConfirmation) throw readError;
-        if (!transient(readError)) throw Object.assign(new Error(`Job ${job._id} needs confirmation: ${readError.message}`, { cause: readError }), { awaitingConfirmation: true });
-      }
-      await delay();
-    }
-  }
-}
-
 export function createLocalJobRunner({ api, runtime, config, runner = runCommand,
   probePublication: probeSite = probePublication, probePreview: probeTemplate = probePreview,
   probeRuntimeSite: probeRuntime = probeRuntimeSite,
-  logger = console, retryDelayMs = 5000 }) {
+  logger = console }) {
   const settings = { sitePort: 3400, previewBaseDomain: "preview.localhost", artifactBaseUrl: "http://127.0.0.1:4401", ...config };
   const dataDir = path.resolve(settings.localDataDir);
   const buildConfig = { STATIC_ASSET_PREFIX: settings.env?.STATIC_ASSET_PREFIX ?? settings.artifactBaseUrl,
     SEARCH_INDEXING_ENABLED: settings.env?.SEARCH_INDEXING_ENABLED ?? process.env.SEARCH_INDEXING_ENABLED ?? "false",
     PREVIEW_BASE_DOMAIN: settings.previewBaseDomain, SITE_PORT: String(settings.sitePort) };
-  return async (job, { signal } = {}) => {
-    if (!safeId.test(job._id || "")) throw new Error("Invalid claimed job ID");
-    const jobDir = path.join(dataDir, "jobs", job._id);
+  return async (request, { signal, onProgress = () => {} } = {}) => {
+    if (!safeId.test(request.requestId || "")) throw new Error("Invalid request ID");
+    const [environment, catalog] = await Promise.all([api("GET", "/site-runtime", undefined, { signal }), api("GET", "/internal/sites", undefined, { signal })]);
+    const sites = ["APPLY_TEMPLATE", "ROLLBACK_RUNTIME"].includes(request.kind) ? catalog.sites : catalog.sites.filter(site => site.merchantId === request.target.merchantId);
+    if (request.kind !== "APPLY_TEMPLATE" && !environment.activeRuntime) throw new Error("No confirmed runtime is installed");
+    if (!["APPLY_TEMPLATE", "INITIALIZE_SITE", "ROLLBACK_RUNTIME"].includes(request.kind) && sites.length !== 1) throw new Error("Merchant does not exist");
+    const job = { ...request, _id: request.requestId, input: { sites, runtime: environment.activeRuntime, targetRuntime: environment.previousRuntime } };
+    const jobDir = path.join(dataDir, "executions", job._id);
     const workDir = path.join(dataDir, "work", job._id);
     const inputDir = path.join(jobDir, "input");
     const sourceRoot = path.join(workDir, "source");
@@ -215,28 +194,34 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
     const logFile = path.join(jobDir, "build.log");
     const resultFile = path.join(jobDir, "build-result.json");
     const merchantResults = job.input.sites.map((site) => ({ merchantId: site.merchantId, siteId: site.siteId,
-      templateId: site.templateId, publishRequestId: site.publishRequestId, validated: false, distributed: false, verified: false }));
+      templateId: site.templateId, contentRevision: site.contentRevision, validated: false, distributed: false, verified: false }));
     const callApi = async (method, route, body) => {
       assertRunning(signal);
       try { return await api(method, route, body, { signal }); }
       catch (error) { if (signal?.aborted) throw stopped(); throw error; }
     };
     const context = { api: callApi, runtime, job, settings, dataDir, jobDir, workDir, inputDir, sourceRoot, artifactDir,
-      resultFile, merchantResults, logger, delay: async () => {
-        try { await sleep(retryDelayMs, undefined, { signal }); }
-        catch (error) { if (signal?.aborted) throw stopped(); throw error; }
-      }, planRuntimeSource, planContentSource,
+      resultFile, merchantResults, logger, planRuntimeSource, planContentSource,
       runtimeId: job.kind === "APPLY_TEMPLATE" ? job._id : job.input.runtime?.runtimeId,
       probeRuntimeSite: probeRuntime,
       previousPublishIds: {}, publications: [], previews: [], buildConfig,
-      async rpc(method, route, body) {
-        while (true) {
-          try { return await callApi(method, route, body); }
-          catch (error) { if (!transient(error)) throw error; logger.error(`Business API unavailable: ${route}; ${error.message}`); await context.delay(); }
+      rpc: callApi,
+      async progress(stage) { onProgress(stage); logger.log(`Build ${job._id}: ${stage}`); },
+      async setInput(patch) { await saveJson(path.join(inputDir, "execution.json"), patch); },
+      async confirmRuntime(current) {
+        const body = { expectedRuntimeId: job.input.runtime?.runtimeId ?? null, current,
+          expectedSites: job.input.sites.map(site => ({ merchantId: site.merchantId, siteId: site.siteId, templateId: site.templateId, state: site.state, contentRevision: site.contentRevision })) };
+        try { return await callApi("POST", "/internal/site-runtime/confirm", body); }
+        catch (error) {
+          // Observe a lost response once; never retry or recreate an operation.
+          try { const observed = await callApi("GET", "/site-runtime");
+            if (observed.activeRuntime?.runtimeId === current.runtimeId) return observed;
+            error.confirmedRuntime = observed.activeRuntime;
+          } catch { throw Object.assign(error, { awaitingConfirmation: true }); }
+          if (!error.status || error.status >= 500) error.awaitingConfirmation = true;
+          throw error;
         }
       },
-      async progress(stage) { logger.log(`Job ${job._id}: ${stage}`); return context.rpc("PUT", `/internal/site-jobs/${job._id}/progress`, { stage, merchantResults }); },
-      async setInput(patch) { return context.rpc("PUT", `/internal/site-jobs/${job._id}/input`, patch); },
       async prepareSource(plan) {
         context.plan = plan;
         if (plan.kind === "content") {
@@ -263,9 +248,9 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
       },
       async writeInputs(sites) {
         await saveJson(path.join(inputDir, "sites.json"), sites.map((site) => ({ id: site.siteId, templateId: site.templateId,
-          hostname: site.hostname, siteUrl: site.siteUrl, contentFile: `sites/${site.siteId}/current.json` })));
+          hostname: site.hostname, siteUrl: site.siteUrl, contentRevision: site.contentRevision, contentFile: `sites/${site.siteId}/current.json` })));
         await Promise.all(sites.map((site) => saveJson(path.join(inputDir, "sites", site.siteId, "current.json"), site.document)));
-        await saveJson(path.join(inputDir, "claimed-sites.json"), job.input.sites);
+        await saveJson(path.join(inputDir, "selected-sites.json"), job.input.sites);
         await saveJson(path.join(inputDir, "build-config.json"), context.buildConfig);
         context.previews = await context.modules.preparePreviewInputs({ sourceRoot, inputDir,
           port: Number(context.buildConfig.SITE_PORT), previewBaseDomain: context.buildConfig.PREVIEW_BASE_DOMAIN });
@@ -295,6 +280,20 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
         if (result.error) throw new Error(result.error);
         context.recordPublications(result.publications);
         if (result.runtimeId !== context.runtimeId || result.jobId !== job._id || context.publications.length !== sites.length) throw new Error("Build result identity or merchant count differs from fixed input");
+        const verifiedSites = new Set();
+        for (const publication of context.publications) {
+          const site = sites.find((entry) => entry.siteId === publication.siteId && entry.templateId === publication.templateId);
+          if (!site || verifiedSites.has(site.siteId) || typeof site.contentRevision !== "string" || !site.contentRevision) {
+            throw new Error("Build publications do not match unique fixed merchant revisions");
+          }
+          const identity = { runtimeId: context.runtimeId, siteId: site.siteId, templateId: site.templateId,
+            publishId: job._id, contentRevision: site.contentRevision };
+          if ([publication.current, publication.manifest].some((record) => !record ||
+            Object.entries(identity).some(([key, value]) => record[key] !== value))) {
+            throw new Error(`Publication identity or content revision differs from fixed input: ${site.siteId}`);
+          }
+          verifiedSites.add(site.siteId);
+        }
         return result;
       },
       async verifySites(sites) {
@@ -325,7 +324,8 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
           runtimeSourceCommit: context.plan.runtimeSourceCommit, templateSources: context.plan.templateSources, buildConfig: context.buildConfig });
         await mkdir(path.dirname(destination), { recursive: true });
         await rename(staging, destination);
-        return { runtimeId: context.runtimeId, appDir: path.join(destination, "app") };
+        return { runtimeId: context.runtimeId, appDir: path.join(destination, "app"), sourceRoot: path.join(destination, "source"),
+          runtimeSourceCommit: context.plan.runtimeSourceCommit, templateSources: context.plan.templateSources, buildConfig: context.buildConfig };
       },
       success(extra = {}) { return { status: "SUCCEEDED", runtimeId: context.runtimeId, merchantResults,
         previousPublishIds: context.previousPublishIds, ...extra }; },
@@ -335,7 +335,7 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
     try {
       try {
         await mkdir(jobDir, { recursive: true });
-        await saveJson(path.join(jobDir, "claimed.json"), job);
+        await saveJson(path.join(jobDir, "request.json"), job);
         if (job.kind === "APPLY_TEMPLATE") result = await applyTemplate(context);
         else if (job.kind === "INITIALIZE_SITE") result = await initializeSite(context);
         else if (job.kind === "PUBLISH_SITE") result = await publishSite(context);
@@ -349,20 +349,10 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
           previousPublishIds: context.previousPublishIds, error: diagnostic(error) };
       }
       await saveJson(path.join(jobDir, "result.json"), result);
-      const record = await confirmResult(context, result);
       confirmed = true;
-      return record;
+      return result;
     } catch (error) {
-      if (error.awaitingConfirmation) {
-        await saveJson(path.join(jobDir, "attention.json"), { jobId: job._id, runtimeId: context.runtimeId,
-          error: diagnostic(error), merchantResults, previousPublishIds: context.previousPublishIds });
-        if (error.code === "STATE_UNCONFIRMED") {
-          // One bounded notification, never a second confirmation/retry loop.
-          const notification = signal ? AbortSignal.any([signal, AbortSignal.timeout(2000)]) : AbortSignal.timeout(2000);
-          try { await api("PUT", `/internal/site-jobs/${job._id}/progress`, { stage: "needs-attention", merchantResults }, { signal: notification }); }
-          catch (failure) { logger.error(`Unconfirmed task notification unavailable: ${job._id}; ${failure.message}`); }
-        }
-      }
+      await saveJson(path.join(jobDir, "result.json"), { status: "FAILED", error: diagnostic(error), runtimeId: context.runtimeId });
       throw error;
     } finally {
       if (confirmed) {

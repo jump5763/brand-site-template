@@ -109,6 +109,7 @@ async function executeFixed(options, dependencies = {}) {
   const sourceRoot = dependencies.sourceRoot || projectRoot;
   const runner = dependencies.runner || run, prepare = dependencies.prepare || prepareWorkspace;
   const publish = dependencies.publish || publishFiles, cleanup = dependencies.cleanup || rm;
+  // jobId is an opaque execution trace retained in the file protocol, never a database task key.
   if (["build", "publish"].includes(mode) && (!safeId.test(runtimeId || "") || !safeId.test(jobId || ""))) throw new Error("--runtime-id and --job-id are required");
   const input = await readFixedInput({ sourceRoot, inputDir, scope });
   if (mode === "validate") return { status: "valid", sites: input.selected.map((site) => site.id) };

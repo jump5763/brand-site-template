@@ -22,9 +22,18 @@ function requireId(value, label) {
   if (typeof value !== "string" || !safeId.test(value)) throw new Error(`Invalid ${label}`);
 }
 
+/** A release reference is a publication fact, not a persistent task lookup. */
+export function publicationReference(pointer) {
+  if (!pointer) return null;
+  requireId(pointer.publishId, "previous publish ID");
+  requireId(pointer.jobId, "previous trace ID");
+  return { publishId: pointer.publishId, jobId: pointer.jobId, contentRevision: pointer.contentRevision ?? null };
+}
+
 async function collectSite({ site, appRoot, available, prerender, runtimeId, publishId }) {
   requireId(site.id, "publication site ID");
   requireId(site.templateId, "publication template ID");
+  if (site.contentRevision != null) requireId(site.contentRevision, "content revision");
   const prefix = `sites/${site.templateId}/${site.id}`;
   const keys = Object.keys(prerender.routes).map((key) => key.replace(/^\//, ""))
     .filter((key) => key === prefix || key.startsWith(prefix + "/")).sort();
@@ -59,7 +68,7 @@ async function collectSite({ site, appRoot, available, prerender, runtimeId, pub
     routes.push({ path: suffix === "/sitemap-data" ? "/sitemap.xml" : suffix || "/",
       cacheKey, kind: page ? "APP_PAGE" : "APP_ROUTE", files });
   }
-  return { site, metadata, manifest: { runtimeId, templateId: site.templateId, siteId: site.id, publishId, routes } };
+  return { site, metadata, manifest: { runtimeId, templateId: site.templateId, siteId: site.id, publishId, contentRevision: site.contentRevision ?? null, routes } };
 }
 
 export async function publishFiles({ nextDir, artifactDir, sites, runtimeId, jobId, publishId = jobId, copy = copyFile }) {
@@ -106,7 +115,11 @@ export async function publishFiles({ nextDir, artifactDir, sites, runtimeId, job
       const currentPath = path.join(siteDir, "current.json");
       const previousBytes = await optionalFile(currentPath);
       const previous = previousBytes ? JSON.parse(previousBytes) : null;
-      const current = { runtimeId, templateId: site.templateId, siteId: site.id, publishId, jobId };
+      if (previous && (previous.runtimeId !== runtimeId || previous.templateId !== site.templateId || previous.siteId !== site.id)) {
+        throw new Error("Previous publication identity differs from the target site");
+      }
+      const current = { runtimeId, templateId: site.templateId, siteId: site.id, publishId, jobId,
+        contentRevision: manifest.contentRevision, previous: publicationReference(previous) };
       await mkdir(releasesDir, { recursive: true });
       const temporary = await mkdtemp(path.join(releasesDir, `.${publishId}-`));
       const pointerTemporary = path.join(siteDir, `.current-${randomUUID()}.tmp`);

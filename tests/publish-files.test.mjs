@@ -7,7 +7,7 @@ import { publishFiles } from "../scripts/publish-files.mjs";
 import { seedArtifacts, put } from "./helpers/artifacts.mjs";
 
 const runtimeId = "runtime-a";
-const site = { id: "a1", templateId: "a" };
+const site = { id: "a1", templateId: "a", contentRevision: "revision-one" };
 const json = async (filename) => JSON.parse(await readFile(filename, "utf8"));
 
 test("empty merchant installation still distributes static assets without creating merchant pointers", async (t) => {
@@ -43,7 +43,7 @@ test("publishes a complete immutable release after static resources, then commit
   assert.equal(result.responses, 4);
   const [publication] = result.publications;
   assert.equal(publication.previous, null);
-  assert.deepEqual(publication.current, { runtimeId, templateId: "a", siteId: "a1", publishId: "publish-first", jobId: "publish-first" });
+  assert.deepEqual(publication.current, { runtimeId, templateId: "a", siteId: "a1", publishId: "publish-first", jobId: "publish-first", contentRevision: "revision-one", previous: null });
   assert.deepEqual(await json(path.join(options.siteDir, "current.json")), publication.current);
   assert.deepEqual(await json(path.join(publication.releaseDir, "manifest.json")), publication.manifest);
   assert.deepEqual(publication.manifest.routes.map(({ path }) => path), ["/", "/menu", "/robots.txt", "/sitemap.xml"]);
@@ -93,6 +93,8 @@ test("a new manifest reflects deleted routes, retains previous release and does 
   await seedArtifacts(options.nextDir, { value: "new", pages: [""] });
   const second = (await publishFiles({ ...options, jobId: "publish-second" })).publications[0];
   assert.deepEqual(second.previous, first.publications[0].current);
+  assert.deepEqual(second.current.previous, { publishId: "publish-first", jobId: "publish-first", contentRevision: "revision-one" });
+  assert.equal(second.manifest.contentRevision, "revision-one");
   assert.equal(second.manifest.routes.some(({ path }) => path === "/menu"), false);
   await assert.rejects(access(path.join(second.releaseDir, "responses/sites/a/a1/menu.html")), { code: "ENOENT" });
   assert.equal(await readFile(path.join(first.publications[0].releaseDir, "responses/sites/a/a1/menu.html"), "utf8"), "<h1>old</h1>");
@@ -109,4 +111,18 @@ test("batch failure exposes already committed merchant results without a cross-m
   } }), (error) => error.publications.length === 1 && error.publications[0].siteId === "a1");
   assert.equal((await json(path.join(options.siteDir, "current.json"))).publishId, "batch");
   await assert.rejects(access(path.join(options.artifactDir, "runtimes", runtimeId, "sites/a/a10/current.json")), { code: "ENOENT" });
+});
+
+
+test("content revision and one previous publication persist independently of task history", async (t) => {
+  const options = await fixture(t);
+  await publishFiles({ ...options, jobId: "one" });
+  await seedArtifacts(options.nextDir, { value: "two" });
+  await publishFiles({ ...options, sites: [{ ...site, contentRevision: "revision-two" }], jobId: "two" });
+  await seedArtifacts(options.nextDir, { value: "three" });
+  const current = (await publishFiles({ ...options, sites: [{ ...site, contentRevision: "revision-three" }], jobId: "three" })).publications[0];
+  assert.equal(current.current.contentRevision, "revision-three");
+  assert.equal(current.manifest.contentRevision, "revision-three");
+  assert.deepEqual(current.current.previous, { publishId: "two", jobId: "two", contentRevision: "revision-two" });
+  assert.equal(Object.hasOwn(current.current.previous, "previous"), false);
 });

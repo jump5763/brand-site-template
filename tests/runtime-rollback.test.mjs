@@ -27,8 +27,7 @@ async function fixture(t, { missingC = false } = {}) {
     return document;
   }\n`);
   const sites = ["a", "c"].map((letter) => ({ merchantId: `merchant-${letter}`, siteId: `site-${letter}`, templateId: `template-${letter}`,
-    siteUrl: `http://merchant-${letter}.localhost:3400`, state: "ACTIVE", publishRequestId: randomUUID(), publishPending: true,
-    activeArtifactJobId: "newer-runtime-artifact", document: { siteId: `site-${letter}`, siteUrl: `http://merchant-${letter}.localhost:3400`, pages: [{ path: "/" }, { path: "/menu" }], marker: `latest-${letter}-content` } }));
+    siteUrl: `http://merchant-${letter}.localhost:3400`, state: "ACTIVE", contentRevision: randomUUID(), document: { siteId: `site-${letter}`, siteUrl: `http://merchant-${letter}.localhost:3400`, pages: [{ path: "/" }, { path: "/menu" }], marker: `latest-${letter}-content` } }));
   const seed = async (site, templateId = site.templateId) => {
     const nextDir = path.join(root, `next-${templateId}-${site.siteId}`);
     await seedArtifacts(nextDir, { id: site.siteId, templateId, value: "retained publication" });
@@ -38,12 +37,12 @@ async function fixture(t, { missingC = false } = {}) {
   await seed(sites[0]);
   if (missingC) await seed(sites[1], "template-a");
   else await seed(sites[1]);
-  const job = { _id: id, kind: "ROLLBACK_RUNTIME", runtimeId, target: { runtimeJobId: targetId, runtimeId, expectedActiveRuntimeJobId: baseId },
-    input: { sites, runtime: { jobId: baseId, runtimeId: "new-runtime" }, targetRuntime: target } };
+  const job = { _id: id, kind: "ROLLBACK_RUNTIME", runtimeId, target: {},
+    input: { sites, runtime: { runtimeId: "new-runtime" }, targetRuntime: target } };
   const events = [], controls = { failVerify: false, failStart: false };
   let currentRuntime = "new-runtime";
-  const context = { job, dataDir, artifactDir, jobDir, runtimeId: "new-runtime", merchantResults: sites.map((site) => ({ merchantId: site.merchantId,
-    siteId: site.siteId, templateId: site.templateId, publishRequestId: site.publishRequestId, validated: false, distributed: false, verified: false })),
+  const context = { confirmRuntime: async () => {}, job, dataDir, artifactDir, jobDir, runtimeId: "new-runtime", merchantResults: sites.map((site) => ({ merchantId: site.merchantId,
+    siteId: site.siteId, templateId: site.templateId, contentRevision: site.contentRevision, validated: false, distributed: false, verified: false })),
     async progress(stage) { events.push(stage); },
     async setInput(patch) { events.push("input"); assert.equal(patch.artifactUri, appDir); },
     async verifyPreviews() { events.push("previews"); assert.equal(this.previews.length, 2); assert.ok(this.previews.every((entry) => entry.siteUrl.includes("old.preview.localhost"))); },

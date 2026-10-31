@@ -84,64 +84,37 @@ async function replacePointer(filename, expected, next) {
   const temporary = `${filename}.${randomUUID()}.tmp`;
   try {
     await writeFile(temporary, next, { flag: "wx" });
-    // The persistent queue admits one writer; recheck immediately before the atomic commit.
+    // The in-memory queue admits one writer; recheck immediately before the atomic commit.
     if (!(await readFile(filename)).equals(expected)) throw new Error("Artifact current pointer changed");
     await rename(temporary, filename);
   } finally { await rm(temporary, { force: true }); }
 }
 
-/** Manual reconciliation restores only the recorded original complete publication. */
-export async function restoreArtifactPointer({ artifactDir, runtimeId, templateId, siteId, expectedPublishId, expectedJobId, publishId, jobId }) {
-  [runtimeId, templateId, siteId, expectedPublishId, expectedJobId, publishId, jobId].forEach(requireId);
-  const publication = await readArtifactPublication({ artifactDir, runtimeId, templateId, siteId, publishId, jobId });
-  const relative = `runtimes/${runtimeId}/sites/${templateId}/${siteId}/current.json`;
-  const beforeBytes = await regularFile(artifactDir, relative);
-  const before = JSON.parse(beforeBytes);
-  if (before.runtimeId !== runtimeId || before.templateId !== templateId || before.siteId !== siteId) throw new Error("Artifact reconciliation identity changed");
-  if (before.publishId === publishId && before.jobId === jobId) return publication;
-  if (before.publishId !== expectedPublishId || before.jobId !== expectedJobId) throw new Error("Artifact pointer changed before reconciliation");
-  await replacePointer(path.join(artifactDir, relative), beforeBytes, Buffer.from(JSON.stringify(publication.current)));
-  return publication;
-}
-
 export async function rollbackSiteArtifact(context) {
   const { job, artifactDir } = context;
-  const target = job.target;
   const site = job.input.sites[0];
-  if (job.kind !== "ROLLBACK_SITE_ARTIFACT" || job.input.sites.length !== 1 || site?.state !== "ACTIVE" ||
-    site.merchantId !== target.merchantId || site.siteId !== target.siteId || site.templateId !== target.templateId ||
-    job.input.runtime?.runtimeId !== target.runtimeId || context.runtimeId !== target.runtimeId ||
-    !Object.hasOwn(job.input.runtime.templateSources ?? {}, target.templateId) || target.targetPublishId === target.expectedCurrentPublishId) {
-    throw new Error("Artifact rollback requires the current runtime and site binding");
-  }
-  await context.progress("validating-artifact");
-  const identity = { artifactDir, runtimeId: target.runtimeId, templateId: target.templateId, siteId: target.siteId };
-  const pointerPath = path.join(artifactDir, "runtimes", requireId(target.runtimeId), "sites", requireId(target.templateId), requireId(target.siteId), "current.json");
-  const beforeBytes = await regularFile(artifactDir, path.relative(artifactDir, pointerPath).split(path.sep).join("/"));
-  const before = JSON.parse(beforeBytes);
-  if (before.runtimeId !== target.runtimeId || before.templateId !== target.templateId || before.siteId !== target.siteId ||
-    before.publishId !== target.expectedCurrentPublishId) throw new Error("Artifact current pointer differs from the confirmed publication");
-  requireId(before.jobId);
-  requireId(before.publishId);
-  const publication = await readArtifactPublication({ ...identity, publishId: target.targetPublishId, jobId: target.targetJobId });
+  if (!site || site.state !== "ACTIVE") throw new Error("An active merchant is required");
+  const identity = { artifactDir, runtimeId: context.runtimeId, templateId: site.templateId, siteId: site.siteId };
+  const current = await readArtifactPublication(identity);
+  const before = current.current;
+  if (!before.previous) throw Object.assign(new Error("No previous complete publication exists in this runtime and binding"), { status: 409 });
+  const publication = await readArtifactPublication({ ...identity, publishId: before.previous.publishId, jobId: before.previous.jobId });
+  publication.current = { ...publication.current, contentRevision: publication.manifest.contentRevision ?? null,
+    previous: { publishId: before.publishId, jobId: before.jobId, contentRevision: before.contentRevision ?? null } };
   publication.previous = before;
-  const nextBytes = Buffer.from(JSON.stringify(publication.current));
-  if (context.jobDir) {
-    await mkdir(context.jobDir, { recursive: true });
-    await writeFile(path.join(context.jobDir, "artifact-before.json"), JSON.stringify({ jobId: job._id, pointer: before }));
-  }
+  const pointerPath = path.join(artifactDir, "runtimes", context.runtimeId, "sites", site.templateId, site.siteId, "current.json");
+  const beforeBytes = await readFile(pointerPath);
+  if (JSON.parse(beforeBytes).publishId !== before.publishId) throw new Error("Publication changed before rollback");
   await context.progress("switching-artifact");
+  const nextBytes = Buffer.from(JSON.stringify(publication.current));
   await replacePointer(pointerPath, beforeBytes, nextBytes);
   try {
     context.recordPublications([publication]);
-    await context.progress("verifying");
     await context.verifySites([site]);
   } catch (error) {
     if (error.code === "STOP_REQUESTED") throw error;
-    try {
-      await replacePointer(pointerPath, nextBytes, beforeBytes);
-      for (const result of context.merchantResults) Object.assign(result, { distributed: false, verified: false });
-    } catch (restoreError) { throw unconfirmedError([error, restoreError], `Artifact verification and pointer restoration failed: ${error.message}; ${restoreError.message}`); }
+    try { await replacePointer(pointerPath, nextBytes, beforeBytes); for (const result of context.merchantResults) Object.assign(result, { distributed: false, verified: false }); }
+    catch (restoreError) { throw unconfirmedError([error, restoreError], "Artifact verification and pointer restoration failed"); }
     throw error;
   }
   return context.success({ artifactUri: publication.releaseDir });

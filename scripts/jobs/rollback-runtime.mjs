@@ -1,3 +1,4 @@
+import { unconfirmedError } from "../job-errors.mjs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -29,10 +30,8 @@ function checkObservations(site, publication, runtimeId, observation) {
 export async function rollbackRuntime(context) {
   const { job } = context;
   const target = job.input.targetRuntime;
-  context.runtimeId = job.runtimeId ?? target?.runtimeId;
-  if (job.kind !== "ROLLBACK_RUNTIME" || !target || !safeId.test(target.runtimeId || "") || target.runtimeId !== job.target.runtimeId ||
-    target.jobId !== job.target.runtimeJobId || job.input.runtime?.jobId !== job.target.expectedActiveRuntimeJobId ||
-    target.runtimeId === job.input.runtime.runtimeId) throw new Error("A fixed previous runtime and current baseline are required");
+  context.runtimeId = target?.runtimeId;
+  if (!target || !safeId.test(target.runtimeId || "") || target.runtimeId === job.input.runtime.runtimeId) throw new Error("A different previous confirmed runtime is required");
   if (typeof context.probeRuntimeSite !== "function") throw new Error("The runtime rollback verification probe is unavailable");
   const appDir = path.join(context.dataDir, "releases", target.runtimeId, "app");
   const sourceRoot = path.join(context.dataDir, "releases", target.runtimeId, "source");
@@ -40,7 +39,7 @@ export async function rollbackRuntime(context) {
   await context.progress("validating-runtime");
   const [bytes] = await Promise.all([readFile(path.join(appDir, "runtime.json"), "utf8"), access(path.join(appDir, "server.js"))]);
   const identity = JSON.parse(bytes);
-  if (identity.runtimeId !== target.runtimeId || identity.jobId !== target.jobId || identity.runtimeSourceCommit !== target.runtimeSourceCommit ||
+  if (identity.runtimeId !== target.runtimeId || identity.runtimeSourceCommit !== target.runtimeSourceCommit ||
     !isDeepStrictEqual(identity.templateSources, target.templateSources) || !identity.buildConfig) throw new Error("Retained package identity differs from the fixed rollback runtime");
   const { validateSiteInput } = await import(pathToFileURL(path.join(sourceRoot, "src/server/site-input.mjs")).href);
   const validations = await Promise.allSettled(job.input.sites.map(async (site) => {
@@ -85,5 +84,12 @@ export async function rollbackRuntime(context) {
     await mkdir(context.jobDir, { recursive: true });
     await writeFile(path.join(context.jobDir, "verification.json"), JSON.stringify({ runtimeId: handle.runtimeId, pid: handle.pid, sites: observations }, null, 2));
   } });
+  try { await context.confirmRuntime(target); }
+  catch (error) { if (!error.awaitingConfirmation) {
+      const previous = Object.hasOwn(error, "confirmedRuntime") ? error.confirmedRuntime : job.input.runtime;
+      try { if (previous) await context.runtime.switchTo(previous); else await context.runtime.stop(); }
+      catch (restoreError) { throw unconfirmedError([error, restoreError], "Runtime confirmation failed and the confirmed package could not be restored"); }
+    }
+    throw error; }
   return context.success({ artifactUri: appDir });
 }

@@ -1,51 +1,55 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { createBuilder } from "../scripts/builder.mjs";
-
-const quiet = { log() {}, error() {} };
-const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
-
-test("polling claims one persistent job and draining waits for its confirmed execution", async () => {
-  const entered = deferred(), finish = deferred();
-  const pending = [{ _id: "one", kind: "PUBLISH_SITE" }, { _id: "two", kind: "PUBLISH_SITE" }];
-  let claims = 0, executionSignal;
-  const builder = createBuilder({ logger: quiet,
-    api: async (method, pathname) => { assert.equal(method, "POST"); assert.equal(pathname, "/internal/site-jobs/claim"); claims++; return pending.shift() ?? null; },
-    execute: async (job, { signal }) => { executionSignal = signal; assert.equal(signal.aborted, false); assert.equal(job._id, "one"); entered.resolve(); await finish.promise; return { status: "SUCCEEDED" }; },
-  });
-  assert.equal(builder.start(), builder);
-  await entered.promise;
-  let drained = false;
-  const stopping = builder.drain().then(() => { drained = true; });
-  assert.equal(builder.stop(), builder.done);
-  await Promise.resolve();
-  assert.equal(drained, false);
-  assert.equal(executionSignal.aborted, true);
-  assert.equal(claims, 1);
-  finish.resolve();
-  await stopping;
-  assert.equal(claims, 1);
-  assert.equal(pending.length, 1);
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {createBuilder} from '../scripts/builder.mjs';
+const quiet={log(){},error(){}};
+const request=id=>({requestId:id,kind:'PUBLISH_SITE',target:{merchantId:'merchant-a'}});
+const deferred=()=>{let resolve;return{promise:new Promise(r=>resolve=r),resolve:v=>resolve(v)}};
+test('HTTP accepts once, exposes volatile status and runs a single FIFO executor',async(t)=>{
+ const entered=deferred(),release=deferred(),order=[];let active=0;
+ const builder=createBuilder({logger:quiet,execute:async(r,{onProgress})=>{onProgress('building');assert.equal(active++,0);order.push(r.requestId);if(r.requestId==='one'){entered.resolve();await release.promise;}active--;return{status:'SUCCEEDED'}}});
+ await new Promise(r=>builder.server.listen(0,'127.0.0.1',r));t.after(async()=>{release.resolve();await builder.stop();await new Promise(r=>builder.server.close(r));});
+ const base=`http://127.0.0.1:${builder.server.address().port}`;
+ const post=body=>fetch(base+'/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await post(request('one'))).status,202);await entered.promise;
+ assert.deepEqual(await(await fetch(base+'/healthz')).json(),{status:'ok',queued:0,running:1,current:{requestId:'one',kind:'PUBLISH_SITE',stage:'building'}});
+ assert.equal((await post(request('two'))).status,202);assert.equal((await post(request('one'))).status,202);
+ assert.equal((await post({...request('one'),target:{merchantId:'other'}})).status,409);
+ assert.equal((await post({})).status,400);assert.equal((await fetch(base+'/builds/missing')).status,404);
+ assert.equal((await(await fetch(base+'/healthz')).json()).queued,1);
+ assert.deepEqual(order,['one']);release.resolve();await builder.done;assert.deepEqual(order,['one','two']);
+ assert.equal((await(await fetch(base+'/builds/two')).json()).status,'SUCCEEDED');
+ assert.deepEqual(await(await fetch(base+'/healthz')).json(),{status:'ok',queued:0,running:0,current:null});
+ const fresh=createBuilder({logger:quiet,execute:async()=>{assert.fail('No replay')}});assert.throws(()=>fresh.get('one'),{status:404});await fresh.stop();
+});
+test('stop drains the executing operation but discards waiting work',async()=>{
+ const entered=deferred(),release=deferred();const order=[];
+ const builder=createBuilder({logger:quiet,execute:async(r,{signal})=>{order.push(r.requestId);entered.resolve();await release.promise;assert.equal(signal.aborted,true);return{status:'SUCCEEDED'}}});
+ builder.submit(request('one'));builder.submit(request('two'));await entered.promise;
+ let ended=false;const stop=builder.stop().then(()=>{ended=true});await Promise.resolve();assert.equal(ended,false);release.resolve();await stop;
+ assert.deepEqual(order,['one']);assert.throws(()=>builder.submit(request('three')),{status:503});
+});
+test('uncertain runtime stops execution; ordinary failures allow the next operation',async()=>{
+ const builder=createBuilder({logger:quiet,execute:async r=>{if(r.requestId==='one')throw new Error('build failure');throw Object.assign(new Error('runtime unknown'),{awaitingConfirmation:true})}});
+ builder.submit(request('one'));builder.submit(request('two'));builder.submit(request('three'));await builder.done;
+ assert.equal(builder.get('one').status,'FAILED');assert.equal(builder.get('two').status,'FAILED');assert.equal(builder.get('three').status,'QUEUED');assert.throws(()=>builder.submit(request('four')),{status:503});await builder.stop();
 });
 
-test("an unconfirmed result stops new claims instead of running another task", async () => {
-  let claims = 0;
-  const builder = createBuilder({ logger: quiet,
-    api: async () => { claims++; return { _id: "one", kind: "APPLY_TEMPLATE" }; },
-    execute: async () => { throw Object.assign(new Error("needs confirmation"), { awaitingConfirmation: true }); },
-  });
-  builder.start();
-  await assert.rejects(builder.done, /needs confirmation/);
-  assert.equal(claims, 1);
-});
 
-test("a temporary claim failure retries without creating a local queue", async () => {
-  let attempts = 0;
-  const builder = createBuilder({ logger: quiet, pollIntervalMs: 1,
-    api: async () => { if (++attempts === 1) throw new Error("API disconnected"); return { _id: "one", kind: "PUBLISH_SITE" }; },
-    execute: async () => { void builder.stop(); return { status: "FAILED" }; },
-  });
-  builder.start();
-  await builder.done;
-  assert.equal(attempts, 2);
+test('a submission at the drain completion boundary is executed without a later request', async () => {
+ const order=[],secondEntered=deferred(),releaseSecond=deferred();let builder;
+ builder=createBuilder({logger:quiet,execute:async request=>{
+  order.push(request.requestId);
+  if(request.requestId==='one')queueMicrotask(()=>queueMicrotask(()=>builder.submit({requestId:'two',kind:'PUBLISH_SITE',target:{merchantId:'merchant-a'}})));
+  else {secondEntered.resolve();await releaseSecond.promise;}
+  return {status:'SUCCEEDED'};
+ }});
+ builder.submit({requestId:'one',kind:'PUBLISH_SITE',target:{merchantId:'merchant-a'}});
+ let completed=false;const done=builder.done.then(()=>{completed=true;});
+ try {
+  await secondEntered.promise;
+  assert.equal(completed,false);
+  assert.deepEqual(order,['one','two']);
+  releaseSecond.resolve();await done;
+  assert.equal(builder.get('two').status,'SUCCEEDED');
+ } finally {releaseSecond.resolve();await builder.stop();}
 });

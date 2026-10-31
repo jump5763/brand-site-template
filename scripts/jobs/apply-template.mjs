@@ -1,3 +1,4 @@
+import { unconfirmedError } from "../job-errors.mjs";
 import path from "node:path";
 
 export async function applyTemplate(context) {
@@ -31,5 +32,14 @@ export async function applyTemplate(context) {
     await context.verifyPreviews();
     await context.verifySites(active);
   } });
+  try { await context.confirmRuntime(candidate); }
+  catch (error) {
+if (!error.awaitingConfirmation) {
+      const previous = Object.hasOwn(error, "confirmedRuntime") ? error.confirmedRuntime : job.input.runtime;
+      try { if (previous) await context.runtime.switchTo(previous); else await context.runtime.stop(); }
+      catch (restoreError) { throw unconfirmedError([error, restoreError], "Runtime confirmation failed and the confirmed package could not be restored"); }
+    }
+    throw error;
+  }
   return context.success({ artifactUri });
 }

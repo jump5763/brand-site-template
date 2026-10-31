@@ -55,6 +55,8 @@ test("empty merchant build packages runtime and previews, and distributes static
 
 test("content publication fixes disk input once and emits real immutable writer results without fetching API", async (t) => {
   const f = await installedTemplate(t, { merchant: true });
+  f.config.contentRevision = "saved-revision-one";
+  await writeFile(path.join(f.inputDir, "sites.json"), JSON.stringify([f.config]));
   const env = await deployed(f);
   let work, builds = 0;
   const title = f.document.pages[0].metadata.title;
@@ -71,6 +73,8 @@ test("content publication fixes disk input once and emits real immutable writer 
   assert.equal(result.status, "published");
   assert.equal(result.publications[0].current.publishId, jobId);
   assert.equal(result.publications[0].current.runtimeId, runtimeId);
+  assert.equal(result.publications[0].current.contentRevision, "saved-revision-one");
+  assert.equal(result.publications[0].manifest.contentRevision, "saved-revision-one");
   assert.equal(result.publications[0].siteId, f.config.id);
   await assert.rejects(access(work), { code: "ENOENT" });
 });

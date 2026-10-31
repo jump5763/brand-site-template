@@ -26,6 +26,7 @@ export function normalizeCatalog(entries, { allowEmpty = false, registeredTempla
   const hosts = new Set();
   return entries.map((entry) => {
     if (!entry || typeof entry.siteId !== "string" || !safeId.test(entry.siteId) || !registeredTemplates.includes(entry.templateId)) throw new Error("Invalid site ID or unregistered template");
+    if (entry.contentRevision != null && (typeof entry.contentRevision !== "string" || !safeId.test(entry.contentRevision))) throw new Error("Invalid content revision");
     const url = new URL(entry.siteUrl);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
       throw new Error(`Invalid site URL: ${entry.siteId}`);
@@ -35,7 +36,7 @@ export function normalizeCatalog(entries, { allowEmpty = false, registeredTempla
     ids.add(entry.siteId);
     hosts.add(hostname);
     return { id: entry.siteId, name: entry.name || entry.siteId, templateId: entry.templateId, hostname, siteUrl: entry.siteUrl,
-      contentFile: `sites/${entry.siteId}/current.json` };
+      contentFile: `sites/${entry.siteId}/current.json`, contentRevision: entry.contentRevision ?? null };
   });
 }
 
@@ -76,7 +77,7 @@ export async function readLocalDocuments(root, selected) {
   }))), { sourceRoot: root });
 }
 
-/** Read a job snapshot once, with validators and dependencies from that job's source. */
+/** Read an execution snapshot once, using its fixed source and content revision. */
 export async function readFixedInput({ sourceRoot = defaultSourceRoot, inputDir, scope = { scope: "all" } }) {
   if (!inputDir || !path.isAbsolute(inputDir)) throw new Error("--input-dir must be an absolute fixed input directory");
   const registeredTemplates = JSON.parse(await readFile(path.join(sourceRoot, "src/template-ids.json"), "utf8"));
