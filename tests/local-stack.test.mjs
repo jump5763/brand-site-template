@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';import test from 'node:test';import http from 'node:http';import {mkdtemp,rm,mkdir,writeFile,readdir} from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {startLocalStack} from '../scripts/local-stack.mjs';
 test('stack serves independent HTTP Builder and never queries persistent tasks or replays work',async(t)=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'http-stack-'));t.after(()=>rm(root,{recursive:true,force:true}));const calls=[];
- const server=http.createServer((req,res)=>{calls.push(req.url);res.setHeader('Content-Type','application/json');if(req.url==='/healthz')res.end('{"status":"ok"}');else if(req.url==='/site-runtime')res.end('{"activeRuntime":null,"previousRuntime":null}');else{res.statusCode=404;res.end('{}');}});
+ const server=http.createServer((req,res)=>{calls.push(req.url);res.setHeader('Content-Type','application/json');if(req.url==='/healthz')res.end('{"status":"ok"}');else if(req.url==='/site-runtime')res.end('{"activeRuntime":null}');else{res.statusCode=404;res.end('{}');}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
  const config={RUNTIME_SOURCE_COMMIT:'a'.repeat(40),TEMPLATE_REPO_DIR:root,LOCAL_DATA_DIR:root,ARTIFACT_PORT:'0',BUILDER_PORT:'0',SITE_PORT:'39991',BUSINESS_API_URL:`http://127.0.0.1:${server.address().port}`};
  for(let i=0;i<2;i++){
   const stack=await startLocalStack({env:config,logger:{log(){},error(){}}});const base=`http://127.0.0.1:${stack.builder.server.address().port}`;
   assert.equal((await fetch(base+'/healthz')).status,200);assert.equal((await fetch(base+'/builds/previous-process-id')).status,404);await stack.close();
  }
- assert.deepEqual(calls,['/healthz','/healthz']);
+ assert.deepEqual(calls,['/healthz','/site-runtime','/healthz','/site-runtime']);
 });
 
 async function stackFixture(t, {missing = false} = {}) {
@@ -38,15 +38,15 @@ async function stackFixture(t, {missing = false} = {}) {
  return{root,activeRuntime,calls,errors,setGate:value=>{gate=value;},start:async options=>stack=await startLocalStack({env,logger:{log(){},error:e=>errors.push(e)},...options})};
 }
 
-test('only explicit startup reads the confirmed package without building or changing confirmation',async t=>{
+test('only explicit startup launches the confirmed package without building or changing confirmation',async t=>{
  const f=await stackFixture(t),stack=await f.start();
  assert.equal(stack.runtime.getCurrent(),null);
- assert.deepEqual(f.calls,[['GET','/healthz']]);
+ assert.deepEqual(f.calls,[['GET','/healthz'],['GET','/site-runtime']]);
  await assert.rejects(stack.startCurrent({runtimeId:'historical'}),/no package selector/);
  const first=await stack.startCurrent();assert.equal(first.runtimeId,f.activeRuntime.runtimeId);
  const stopped=await stack.runtime.stop();assert.equal(stopped.stopped,true);assert.equal(stopped.pid,first.pid);
  const second=await stack.startCurrent();assert.equal(second.runtimeId,first.runtimeId);assert.notEqual(second.pid,first.pid);
- assert.deepEqual(f.calls,[['GET','/healthz'],['GET','/site-runtime'],['GET','/site-runtime']]);
+ assert.deepEqual(f.calls,[['GET','/healthz'],['GET','/site-runtime'],['GET','/site-runtime'],['GET','/site-runtime']]);
  assert.deepEqual((await readdir(f.root)).sort(),['app','artifacts','run']);
 });
 
@@ -79,4 +79,30 @@ test('explicit startup and Builder execution share an exclusion boundary',async 
  await starting;
  assert.equal(stack.runtime.getCurrent().runtimeId,'current-one');
  assert.equal(f.calls.some(([,route])=>route==='/internal/sites'),false);
+});
+
+
+test('stack checks retention at startup and hourly while idle, then cancels the timer',async t=>{
+ const f=await stackFixture(t);
+ const expired=path.join(f.root,'executions','old');await mkdir(expired,{recursive:true});
+ const terminal={status:'FAILED',endedAt:new Date(Date.now()-8*24*60*60*1000).toISOString()};
+ await writeFile(path.join(expired,'result.json'),JSON.stringify(terminal));
+ t.mock.timers.enable({apis:['setInterval']});
+ const stack=await f.start();
+ assert.equal((await readdir(path.join(f.root,'executions'))).length,0);
+ await mkdir(expired,{recursive:true});await writeFile(path.join(expired,'result.json'),JSON.stringify(terminal));
+ t.mock.timers.tick(60*60*1000);
+ const deadline=Date.now()+2000;
+ while((await readdir(path.join(f.root,'executions'))).length&&Date.now()<deadline)await new Promise(r=>setTimeout(r,10));
+ assert.equal((await readdir(path.join(f.root,'executions'))).length,0);
+ await stack.close();const count=f.calls.length;t.mock.timers.tick(60*60*1000);await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,count);
+});
+
+
+test('startup releases proven stopped work but preserves unknown remnants',async t=>{
+ const f=await stackFixture(t);
+ for(const id of ['stopped','unknown']){await mkdir(path.join(f.root,'work',id),{recursive:true});await writeFile(path.join(f.root,'work',id,'input.json'),'content');}
+ const evidence=path.join(f.root,'executions','stopped');await mkdir(evidence,{recursive:true});
+ await writeFile(path.join(evidence,'result.json'),JSON.stringify({requestId:'stopped',childrenExited:true,status:'FAILED',endedAt:new Date().toISOString()}));
+ const stack=await f.start();assert.deepEqual(await readdir(path.join(f.root,'work')),['unknown']);await stack.close();
 });

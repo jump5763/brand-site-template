@@ -28,6 +28,9 @@ export async function startLocalStack({ env = process.env, logger = console, sig
     pending = Promise.resolve().then(operation);
     try { return await pending; } finally { operating = false; }
   };
+  await runJob.maintenance();
+  const cleanupTimer = setInterval(() => { if (!operating && !closing) void runJob.maintenance(); }, 60 * 60 * 1000);
+  cleanupTimer.unref();
   const execute = (...args) => exclusive(() => runJob(...args));
   const builder=createBuilder({execute,logger});
   const startConfirmed = (...args) => exclusive(async () => {
@@ -40,9 +43,10 @@ export async function startLocalStack({ env = process.env, logger = console, sig
     await listen(artifacts,artifactPort);
     signal?.throwIfAborted();
     await listen(builder.server,builderPort);
-  } catch(error){await runtime.stop();if(artifacts.listening)await new Promise(r=>artifacts.close(r));throw error;}
+  } catch(error){clearInterval(cleanupTimer);await runtime.stop();if(artifacts.listening)await new Promise(r=>artifacts.close(r));throw error;}
   logger.log(`HTTP Builder ready on ${builder.server.address().port}; artifacts ${artifacts.address().port}; runtime ${runtime.getCurrent()?.runtimeId||"none"}`);
   const close=()=>closing??=(async()=>{
+    clearInterval(cleanupTimer);
     signal?.removeEventListener("abort",stop);
     const serverClosed=new Promise(resolve=>builder.server.close(resolve));
     try{await builder.stop();}finally{await pending.catch(()=>{});try{await runtime.stop();}finally{await Promise.all([serverClosed,new Promise(resolve=>artifacts.close(resolve))]);}}

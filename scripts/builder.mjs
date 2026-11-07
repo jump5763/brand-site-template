@@ -1,17 +1,18 @@
 import http from "node:http";
+import { isMerchantId } from "../src/server/site-input.mjs";
 import { isDeepStrictEqual } from "node:util";
 
-export const operationKinds = ["APPLY_TEMPLATE", "INITIALIZE_SITE", "PUBLISH_SITE", "SWITCH_TEMPLATE", "ROLLBACK_RUNTIME", "ROLLBACK_SITE_ARTIFACT"];
+export const operationKinds = ["APPLY_TEMPLATE", "PUBLISH_SITE"];
 const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
 /** One HTTP process owns the queue and its volatile observations. Nothing replays on restart. */
 export function createBuilder({ execute, logger = console }) {
   const records = new Map(), queue = [];
-  let accepting = true, processing, blocked = false, current = null;
+  let accepting = true, processing, current = null;
   const cancellation = new AbortController();
   async function drain() {
-    while (queue.length && !blocked) {
+    while (queue.length) {
       const record = queue.shift();
       record.status = "RUNNING";
       record.stage = "starting";
@@ -22,7 +23,6 @@ export function createBuilder({ execute, logger = console }) {
         Object.assign(record, result);
       } catch (error) {
         Object.assign(record, { status: "FAILED", error: { code: error.code || "BUILD_FAILED", message: error.message } });
-        if (error.awaitingConfirmation) { blocked = true; accepting = false; }
         logger.error(`Builder ${record.requestId}: ${error.message}`);
       }
       current = null;
@@ -34,22 +34,22 @@ export function createBuilder({ execute, logger = console }) {
       processing = undefined;
       // A submission may arrive after drain exits but before this continuation.
       // Chain the next pass so callers already awaiting done include that work.
-      if (queue.length && accepting && !blocked) return startDrain();
+      if (queue.length && accepting) return startDrain();
     });
     return processing;
   }
   function submit(request) {
     if (!request || !safeId.test(request.requestId || "") || !operationKinds.includes(request.kind) ||
       !request.target || typeof request.target !== "object" || Array.isArray(request.target)) throw fail(400, "Expected requestId, kind and target");
-    if (request.kind !== "ROLLBACK_RUNTIME" && request.kind !== "APPLY_TEMPLATE" && !safeId.test(request.target.merchantId || "")) throw fail(400, "merchantId is required");
-    if (["APPLY_TEMPLATE", "INITIALIZE_SITE"].includes(request.kind) && !safeId.test(request.target.templateId || "")) throw fail(400, "templateId is required");
-    if (request.kind === "SWITCH_TEMPLATE" && !safeId.test(request.target.targetTemplateId || request.target.templateId || "")) throw fail(400, "targetTemplateId is required");
+    if (request.kind === "PUBLISH_SITE" && (!isMerchantId(request.target.merchantId) ||
+      Object.keys(request.target).join(",") !== "merchantId")) throw fail(400, "PUBLISH_SITE target must contain only merchantId");
+    if (request.kind === "APPLY_TEMPLATE" && !safeId.test(request.target.templateId || "")) throw fail(400, "templateId is required");
     const existing = records.get(request.requestId);
     if (existing) {
       if (!isDeepStrictEqual(existing.request, request)) throw fail(409, "requestId belongs to another operation");
       return existing;
     }
-    if (!accepting) throw fail(503, "Builder is stopping or requires a checked restart");
+    if (!accepting) throw fail(503, "Builder is stopping");
     const record = { requestId: request.requestId, request: structuredClone(request), status: "QUEUED", stage: "queued", createdAt: new Date().toISOString() };
     records.set(request.requestId, record);queue.push(record);
     if (!processing) startDrain();

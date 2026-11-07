@@ -1,4 +1,3 @@
-import { unconfirmedError } from "../job-errors.mjs";
 import path from "node:path";
 
 export async function applyTemplate(context) {
@@ -9,7 +8,7 @@ export async function applyTemplate(context) {
   // Every explicit apply deploys once, including unchanged source with new build settings.
   await context.prepareSource(plan);
   await context.progress("installing-template");
-  await context.modules.installTemplates({ sourceRoot, templateRepoDir: settings.templateRepoDir, templateSources: plan.templateSources });
+  await context.modules.installTemplates({ sourceRoot, templateRepoDir: settings.templateRepoDir, templateSources: plan.templateSources, temporaryRoot: context.workDir });
   await context.progress("validating");
   // A fixed host SHA also fixes shared dependencies and its lockfile.
   const hostChanged = plan.runtimeSourceCommit !== job.input.runtime?.runtimeSourceCommit;
@@ -28,16 +27,36 @@ export async function applyTemplate(context) {
   await context.compile("build", active, appDir);
   const candidate = await context.commitRuntime(appDir);
   await context.progress("deploying");
-  await context.runtime.switchTo(candidate, { verify: async () => {
-    await context.verifyPreviews();
-    await context.verifySites(active);
-  } });
-  try { await context.confirmRuntime(candidate); }
-  catch (error) {
-if (!error.awaitingConfirmation) {
-      const previous = Object.hasOwn(error, "confirmedRuntime") ? error.confirmedRuntime : job.input.runtime;
-      try { if (previous) await context.runtime.switchTo(previous); else await context.runtime.stop(); }
-      catch (restoreError) { throw unconfirmedError([error, restoreError], "Runtime confirmation failed and the confirmed package could not be restored"); }
+  const previous = context.runtime.getCurrent();
+  context.candidateStarted = true;
+  let candidateHandle;
+  try {
+    candidateHandle = await context.runtime.switchTo(candidate, { verify: async () => {
+      await context.verifyPreviews();
+      await context.verifySites(active);
+    } });
+    if (previous && previous.runtimeId !== candidate.runtimeId) {
+      // The previous process has exited; the active confirmation still protects its package.
+      context.recordRuntimeFact({ runtimeId: previous.runtimeId, disposition: "retired", stopped: true, confirmation: "known" });
+    }
+    await context.progress("confirming");
+    await context.confirmRuntime(candidate);
+  } catch (error) {
+    // Stop only this candidate. A failed stop never authorizes starting an old package.
+    const actual = context.runtime.getCurrent();
+    if (actual?.runtimeId === candidate.runtimeId || (!actual && candidateHandle?.runtimeId === candidate.runtimeId)) {
+      try {
+        const stopped = await context.runtime.stop();
+        if (!stopped.stopped && candidateHandle?.exited) {
+          await candidateHandle.exited;
+          Object.assign(stopped, { stopped: true, processState: "stopped", runtimeId: candidate.runtimeId, pid: candidateHandle.pid });
+        }
+        Object.assign(error, stopped);
+      }
+      catch (stopError) { Object.assign(error, { stopped: false, processState: "unknown", message: `${error.message}; candidate stop failed: ${stopError.message}` }); }
+    }
+    if (error.stopped === true && error.confirmation !== "unknown") {
+      context.recordRuntimeFact({ runtimeId: candidate.runtimeId, disposition: "abandoned", stopped: true, confirmation: "known" });
     }
     throw error;
   }

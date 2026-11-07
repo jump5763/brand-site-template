@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile, readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { runCommand } from "../scripts/local-jobs.mjs";
@@ -39,4 +39,21 @@ if(process.env.FIXTURE_FAIL)process.exitCode=23;
   await rm(sourceRoot, { recursive: true });
   assert.match(await readFile(logFile, "utf8"), /fixed-cli:publish --site site-one/);
   await access(path.join(root, "jobs/--all.json"));
+});
+
+
+test("child stdout and stderr retain at most two MiB across commands and keep draining", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bounded-build-log-"));
+  t.after(() => rm(root, {recursive:true,force:true}));
+  const logFile = path.join(root, "build.log");
+  for (let command = 0; command < 2; command++) {
+    const script = `const chunk=Buffer.alloc(65536,${65+command});for(let n=0;n<48;n++){process.stdout.write(chunk);process.stderr.write(chunk);}process.stdout.write("END-${command}");`;
+    await runCommand(process.execPath, ["-e",script],root,process.env,{logFile});
+    const files = await readdir(root);
+    assert.deepEqual(files.sort(), ["build.log","build.log.1"]);
+    const sizes = await Promise.all(files.map(file=>stat(path.join(root,file)).then(s=>s.size)));
+    assert.ok(sizes.reduce((a,b)=>a+b,0)<=2*1024*1024);
+    const recent = Buffer.concat(await Promise.all(["build.log.1","build.log"].map(file=>readFile(path.join(root,file))))).toString();
+    assert.ok(recent.includes(`END-${command}`));
+  }
 });

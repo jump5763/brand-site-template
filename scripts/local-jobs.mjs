@@ -1,25 +1,24 @@
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { Writable } from "node:stream";
+import { cp, mkdir, readFile, readdir, lstat, open, stat, rename, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import https from "node:https";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { planContentSource, planRuntimeSource, prepareSourceSnapshot } from "./runtime-source.mjs";
 import { applyTemplate } from "./jobs/apply-template.mjs";
-import { initializeSite } from "./jobs/initialize-site.mjs";
 import { publishSite } from "./jobs/publish-site.mjs";
-import { switchTemplate } from "./jobs/switch-template.mjs";
-import { rollbackSiteArtifact } from "./jobs/rollback-site-artifact.mjs";
-import { rollbackRuntime } from "./jobs/rollback-runtime.mjs";
+
+import { isMerchantId, normalizeMerchantDocument } from "../src/server/site-input.mjs";
+import { cleanupLocalData } from "./local-cleanup.mjs";
 
 const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
-const stopped = () => Object.assign(new Error("Local task stopped with its result pending confirmation"), { code: "STOP_REQUESTED", awaitingConfirmation: true });
+const stopped = () => Object.assign(new Error("Local operation stopped"), { code: "STOP_REQUESTED" });
 const assertRunning = (signal) => { if (signal?.aborted) throw stopped(); };
 const json = async (filename) => JSON.parse(await readFile(filename, "utf8"));
 const saveJson = async (filename, value) => { await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, JSON.stringify(value, null, 2)); };
 const diagnostic = (error) => ({ code: error.code || "JOB_FAILED", message: error.message,
+  ...Object.fromEntries(["phase", "objectPath", "partial", "confirmation", "processState", "stopped", "runtimeId", "pid"].filter(key => error[key] !== undefined).map(key => [key, error[key]])),
   ...(error.diagnostics ? { diagnostics: error.diagnostics } : {}),
   ...(error instanceof AggregateError ? { errors: error.errors.map(diagnostic) } : {}) });
 
@@ -37,24 +36,60 @@ export function createBusinessApi({ baseUrl, timeoutMs = 30_000 }) {
   };
 }
 
-/** Child output survives work cleanup; shutdown does not interrupt accepted builds. */
-export async function runCommand(command, args, cwd, env, { logFile }) {
+/** Bound the combined current and previous log to two one-MiB chunks. */
+async function boundedLog(logFile) {
+  const limit = 1024 * 1024;
   await mkdir(path.dirname(logFile), { recursive: true });
+  const previous = `${logFile}.1`;
+  try { if ((await stat(previous)).size > limit) await rm(previous); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  let file = await open(logFile, "a");
+  let size = (await file.stat()).size;
+  if (size > limit) { await file.truncate(0); size = 0; }
+  const close = async () => { const handle = file; file = null; if (handle) await handle.close(); };
+  return new Writable({
+    write(chunk, encoding, callback) {
+      (async () => {
+        let offset = 0;
+        while (offset < chunk.length) {
+          if (size === limit) {
+            await close();
+            await rm(previous, { force: true });
+            await rename(logFile, previous);
+            file = await open(logFile, "a");
+            size = 0;
+          }
+          const length = Math.min(limit - size, chunk.length - offset);
+          await file.writeFile(chunk.subarray(offset, offset + length));
+          offset += length;
+          size += length;
+        }
+      })().then(() => callback(), callback);
+    },
+    final(callback) { close().then(() => callback(), callback); },
+    destroy(error, callback) { close().then(() => callback(error), callback); },
+  });
+}
+
+/** Resolve only after the child exits and bounded output is flushed. */
+export async function runCommand(command, args, cwd, env, { logFile }) {
+  const log = await boundedLog(logFile);
   return new Promise((resolve, reject) => {
-    const log = createWriteStream(logFile, { flags: "a" });
     const publishingCli = command === process.execPath && path.resolve(args[0] || "") === path.join(path.resolve(cwd), "scripts/sites.mjs");
     const guardedArgs = publishingCli ? ["--import", fileURLToPath(new URL("./cli-parent-guard.mjs", import.meta.url)), ...args] : args;
     const child = spawn(command, guardedArgs, { cwd, env, stdio: ["ignore", "pipe", "pipe", ...(publishingCli ? ["ipc"] : [])] });
     let error;
-    log.on("error", (cause) => { error = cause; child.kill("SIGTERM"); });
+    log.on("error", (cause) => { error = cause; child.kill("SIGTERM"); child.stdout.resume(); child.stderr.resume(); });
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });
     child.once("error", (cause) => { error = cause; });
-    child.once("close", (code, signal) => log.end(() => {
-      if (error) reject(error);
-      else if (code !== 0) reject(new Error(`${path.basename(command)} failed (${code ?? signal}); see ${logFile}`));
-      else resolve();
-    }));
+    child.once("close", (code, signal) => {
+      const finish = () => {
+        if (error) reject(error);
+        else if (code !== 0) reject(new Error(`${path.basename(command)} failed (${code ?? signal}); see ${logFile}`));
+        else resolve();
+      };
+      if (log.destroyed) finish(); else log.end(finish);
+    });
   });
 }
 
@@ -85,34 +120,14 @@ async function checkAssets(html, siteUrl) {
   return unique.map((url) => url.href);
 }
 
-export async function probePublication({ site, publication, runtimeId }) {
-  const observations = [];
-  let homepage;
-  for (const route of publication.manifest.routes) {
-    const response = await requestBytes(new URL(route.path, site.siteUrl), { localHost: true });
-    if (response.status !== 200 || response.headers["x-brand-site-runtime-id"] !== runtimeId ||
-      response.headers["x-brand-site-publish-id"] !== publication.current.publishId) {
-      throw new Error(`Publication identity mismatch: ${site.siteId}${route.path}; HTTP ${response.status}`);
-    }
-    if (route.path === "/") homepage = response.body.toString();
-    observations.push({ path: route.path, status: response.status, runtimeId, publishId: publication.current.publishId });
-  }
-  if (!homepage?.includes(`data-site-id="${site.siteId}"`)) throw new Error(`Merchant homepage identity is missing: ${site.siteId}`);
-  return { routes: observations, assets: await checkAssets(homepage, site.siteUrl) };
-}
-
-export async function probeRuntimeSite({ site, runtimeId, publication }) {
-  const pagePaths = new Set(["/", ...(site.document.pages ?? []).map((page) => page.path)]);
-  const routes = new Map((publication?.manifest.routes ?? []).map((route) => [route.path, route]));
-  const paths = [...new Set([...pagePaths, ...routes.keys()])];
+export async function probePublication({ site, runtimeId, publication }) {
+  const routes = new Map((publication.routes ?? []).map((route) => [route.path, route]));
+  const paths = [...routes.keys()];
   const origin = new URL(site.siteUrl).origin;
   function responseIdentity(response, pathname) {
     const responseRuntimeId = response.headers["x-brand-site-runtime-id"] ?? null;
     const publishId = response.headers["x-brand-site-publish-id"] ?? null;
-    const published = routes.has(pathname);
-    if (response.status !== 200 || !response.body.length || (published
-      ? responseRuntimeId !== runtimeId || publishId !== publication.current.publishId
-      : publishId !== null || (responseRuntimeId !== null && responseRuntimeId !== runtimeId))) {
+    if (response.status !== 200 || !response.body.length || responseRuntimeId !== runtimeId || publishId !== publication.publishId) {
       throw new Error(`Runtime response identity mismatch: ${site.siteId}${pathname}; HTTP ${response.status}`);
     }
     return { path: pathname, status: response.status, responseRuntimeId, publishId };
@@ -122,7 +137,7 @@ export async function probeRuntimeSite({ site, runtimeId, publication }) {
     if (typeof pathname !== "string" || !pathname.startsWith("/") || url.origin !== origin) throw new Error("Invalid runtime verification route");
     const response = await requestBytes(url, { localHost: true });
     const observation = responseIdentity(response, pathname);
-    const isPage = routes.has(pathname) ? routes.get(pathname).kind === "APP_PAGE" : pagePaths.has(pathname);
+    const isPage = routes.get(pathname).kind === "APP_PAGE";
     if (!isPage) return { observation, assets: [] };
     const html = response.body.toString();
     if (!html.includes(`data-site-id="${site.siteId}"`) || !html.includes(`data-template="${site.templateId}"`)) {
@@ -159,206 +174,255 @@ export async function probePreview({ templateId, siteUrl }) {
   return { templateId, siteUrl, status: response.status, assets: await checkAssets(html, siteUrl) };
 }
 
-async function snapshotHash(root) {
-  async function entries(directory, prefix = "") {
-    const files = await readdir(directory, { withFileTypes: true });
-    return (await Promise.all(files.map(async (entry) => entry.isDirectory()
-      ? entries(path.join(directory, entry.name), `${prefix}${entry.name}/`) : [`${prefix}${entry.name}`]))).flat();
-  }
-  const files = (await entries(root)).sort();
-  const hashes = await Promise.all(files.map(async (file) => `${file}\0${createHash("sha256").update(await readFile(path.join(root, file))).digest("hex")}\n`));
-  return createHash("sha256").update(hashes.join("")).digest("hex");
-}
-
 export function createLocalJobRunner({ api, runtime, config, runner = runCommand,
   probePublication: probeSite = probePublication, probePreview: probeTemplate = probePreview,
-  probeRuntimeSite: probeRuntime = probeRuntimeSite,
-  logger = console }) {
+  checkRuntime = async expected => {
+    const response = await requestBytes(new URL(`http://127.0.0.1:${config.sitePort || 3400}/healthz`));
+    const body = JSON.parse(response.body.toString());
+    if (response.status !== 200 || body.status !== "ok" || body.runtimeId !== expected.runtimeId) throw new Error("Runtime health identity mismatch");
+  }, logger = console, cleanup = cleanupLocalData }) {
   const settings = { sitePort: 3400, previewBaseDomain: "preview.localhost", artifactBaseUrl: "http://127.0.0.1:4401", ...config };
   const dataDir = path.resolve(settings.localDataDir);
-  const buildConfig = { STATIC_ASSET_PREFIX: settings.env?.STATIC_ASSET_PREFIX ?? settings.artifactBaseUrl,
+  const activeRequests = new Set(), stoppedRequests = new Set(), inFlightRuntimes = new Set(), runtimeFacts = new Map();
+  const defaultBuildConfig = { STATIC_ASSET_PREFIX: settings.env?.STATIC_ASSET_PREFIX ?? settings.artifactBaseUrl,
     SEARCH_INDEXING_ENABLED: settings.env?.SEARCH_INDEXING_ENABLED ?? process.env.SEARCH_INDEXING_ENABLED ?? "false",
     PREVIEW_BASE_DOMAIN: settings.previewBaseDomain, SITE_PORT: String(settings.sitePort) };
-  return async (request, { signal, onProgress = () => {} } = {}) => {
-    if (!safeId.test(request.requestId || "")) throw new Error("Invalid request ID");
-    const [environment, catalog] = await Promise.all([api("GET", "/site-runtime", undefined, { signal }), api("GET", "/internal/sites", undefined, { signal })]);
-    const sites = ["APPLY_TEMPLATE", "ROLLBACK_RUNTIME"].includes(request.kind) ? catalog.sites : catalog.sites.filter(site => site.merchantId === request.target.merchantId);
-    if (request.kind !== "APPLY_TEMPLATE" && !environment.activeRuntime) throw new Error("No confirmed runtime is installed");
-    if (!["APPLY_TEMPLATE", "INITIALIZE_SITE", "ROLLBACK_RUNTIME"].includes(request.kind) && sites.length !== 1) throw new Error("Merchant does not exist");
-    const job = { ...request, _id: request.requestId, input: { sites, runtime: environment.activeRuntime, targetRuntime: environment.previousRuntime } };
-    const jobDir = path.join(dataDir, "executions", job._id);
-    const workDir = path.join(dataDir, "work", job._id);
-    const inputDir = path.join(jobDir, "input");
-    const sourceRoot = path.join(workDir, "source");
-    const artifactDir = path.join(dataDir, "artifacts");
-    const logFile = path.join(jobDir, "build.log");
-    const resultFile = path.join(jobDir, "build-result.json");
-    const merchantResults = job.input.sites.map((site) => ({ merchantId: site.merchantId, siteId: site.siteId,
-      templateId: site.templateId, contentRevision: site.contentRevision, validated: false, distributed: false, verified: false }));
-    const callApi = async (method, route, body) => {
-      assertRunning(signal);
-      try { return await api(method, route, body, { signal }); }
-      catch (error) { if (signal?.aborted) throw stopped(); throw error; }
-    };
-    const context = { api: callApi, runtime, job, settings, dataDir, jobDir, workDir, inputDir, sourceRoot, artifactDir,
-      resultFile, merchantResults, logger, planRuntimeSource, planContentSource,
-      runtimeId: job.kind === "APPLY_TEMPLATE" ? job._id : job.input.runtime?.runtimeId,
-      probeRuntimeSite: probeRuntime,
-      previousPublishIds: {}, publications: [], previews: [], buildConfig,
-      rpc: callApi,
-      async progress(stage) { onProgress(stage); logger.log(`Build ${job._id}: ${stage}`); },
-      async setInput(patch) { await saveJson(path.join(inputDir, "execution.json"), patch); },
-      async confirmRuntime(current) {
-        const body = { expectedRuntimeId: job.input.runtime?.runtimeId ?? null, current,
-          expectedSites: job.input.sites.map(site => ({ merchantId: site.merchantId, siteId: site.siteId, templateId: site.templateId, state: site.state, contentRevision: site.contentRevision })) };
-        try { return await callApi("POST", "/internal/site-runtime/confirm", body); }
-        catch (error) {
-          // Observe a lost response once; never retry or recreate an operation.
-          try { const observed = await callApi("GET", "/site-runtime");
-            if (observed.activeRuntime?.runtimeId === current.runtimeId) return observed;
-            error.confirmedRuntime = observed.activeRuntime;
-          } catch { throw Object.assign(error, { awaitingConfirmation: true }); }
-          if (!error.status || error.status >= 500) error.awaitingConfirmation = true;
-          throw error;
-        }
-      },
-      async prepareSource(plan) {
-        context.plan = plan;
-        if (plan.kind === "content") {
-          const deployed = await json(path.join(job.input.runtime.appDir, "runtime.json"));
-          if (deployed.runtimeId !== context.runtimeId || !deployed.buildConfig) throw new Error("Deployed runtime build configuration is unavailable");
-          context.buildConfig = Object.fromEntries(Object.keys(buildConfig).map((key) => [key, deployed.buildConfig[key]]));
-        }
-        await context.setInput({ runtimeId: context.runtimeId, runtimeSourceCommit: plan.runtimeSourceCommit, templateSources: plan.templateSources });
-        await saveJson(path.join(inputDir, "source.json"), plan);
-        await prepareSourceSnapshot({ plan, sourceRoot });
-        await runner("corepack", ["pnpm", "install", "--frozen-lockfile", "--offline", "--reporter=silent"], sourceRoot,
-          { ...process.env, ...settings.env, CI: "true", NODE_ENV: "development" }, { logFile });
-        context.modules = await import(pathToFileURL(path.join(sourceRoot, "scripts/install-template.mjs")).href);
-        context.content = await import(pathToFileURL(path.join(sourceRoot, "src/server/site-input.mjs")).href);
-      },
-      async validate(site) {
-        const entry = merchantResults.find((item) => item.siteId === site.siteId);
-        try {
-          const document = await context.content.validateSiteInput({ sourceRoot, templateId: site.templateId, document: site.document,
-            identity: { siteId: site.siteId, templateId: site.templateId, siteUrl: site.siteUrl } });
-          if (entry) entry.validated = true;
-          return { ...site, document };
-        } catch (error) { if (entry) entry.error = diagnostic(error); throw error; }
-      },
-      async writeInputs(sites) {
-        await saveJson(path.join(inputDir, "sites.json"), sites.map((site) => ({ id: site.siteId, templateId: site.templateId,
-          hostname: site.hostname, siteUrl: site.siteUrl, contentRevision: site.contentRevision, contentFile: `sites/${site.siteId}/current.json` })));
-        await Promise.all(sites.map((site) => saveJson(path.join(inputDir, "sites", site.siteId, "current.json"), site.document)));
-        await saveJson(path.join(inputDir, "selected-sites.json"), job.input.sites);
-        await saveJson(path.join(inputDir, "build-config.json"), context.buildConfig);
-        context.previews = await context.modules.preparePreviewInputs({ sourceRoot, inputDir,
-          port: Number(context.buildConfig.SITE_PORT), previewBaseDomain: context.buildConfig.PREVIEW_BASE_DOMAIN });
-        await context.setInput({ snapshotUri: inputDir, snapshotHash: await snapshotHash(inputDir) });
-      },
-      recordPublications(publications = []) {
-        context.publications = publications;
-        for (const publication of publications) {
-          context.previousPublishIds[publication.siteId] = publication.previous?.publishId ?? null;
-          const entry = merchantResults.find((item) => item.siteId === publication.siteId && item.templateId === publication.templateId);
-          if (entry) Object.assign(entry, { validated: true, distributed: true, publishId: publication.current.publishId });
-        }
-      },
-      async compile(mode, sites, output) {
-        await context.progress("building");
-        const args = [path.join(sourceRoot, "scripts/sites.mjs"), mode, "--all", "--input-dir", inputDir,
-          "--runtime-id", context.runtimeId, "--job-id", job._id, "--result-file", resultFile, ...(output ? ["--output", output] : [])];
-        const env = { ...process.env, ...settings.env, ...context.buildConfig, ARTIFACT_DIR: artifactDir };
-        if (mode === "publish") env.APP_DIR = job.input.runtime.appDir;
-        else delete env.APP_DIR;
-        try { await runner(process.execPath, args, sourceRoot, env, { logFile }); }
-        catch (error) {
-          try { context.recordPublications((await json(resultFile)).publications); } catch { /* A failed child may not have produced a result. */ }
-          throw error;
-        }
-        const result = await json(resultFile);
-        if (result.error) throw new Error(result.error);
-        context.recordPublications(result.publications);
-        if (result.runtimeId !== context.runtimeId || result.jobId !== job._id || context.publications.length !== sites.length) throw new Error("Build result identity or merchant count differs from fixed input");
-        const verifiedSites = new Set();
-        for (const publication of context.publications) {
-          const site = sites.find((entry) => entry.siteId === publication.siteId && entry.templateId === publication.templateId);
-          if (!site || verifiedSites.has(site.siteId) || typeof site.contentRevision !== "string" || !site.contentRevision) {
-            throw new Error("Build publications do not match unique fixed merchant revisions");
-          }
-          const identity = { runtimeId: context.runtimeId, siteId: site.siteId, templateId: site.templateId,
-            publishId: job._id, contentRevision: site.contentRevision };
-          if ([publication.current, publication.manifest].some((record) => !record ||
-            Object.entries(identity).some(([key, value]) => record[key] !== value))) {
-            throw new Error(`Publication identity or content revision differs from fixed input: ${site.siteId}`);
-          }
-          verifiedSites.add(site.siteId);
-        }
-        return result;
-      },
-      async verifySites(sites) {
-        const observations = [];
-        for (const site of sites) {
-          const publication = context.publications.find((item) => item.siteId === site.siteId && item.templateId === site.templateId);
-          if (!publication) throw new Error(`Missing published merchant: ${site.siteId}`);
-          const entry = merchantResults.find((item) => item.siteId === site.siteId);
-          let checked;
-          try { checked = await probeSite({ site, publication, runtimeId: context.runtimeId }); }
-          catch (error) { entry.error = diagnostic(error); throw error; }
-          entry.verified = true;
-          observations.push({ siteId: site.siteId, ...checked });
-        }
-        await saveJson(path.join(jobDir, "verification.json"), observations);
-      },
-      async verifyPreviews() {
-        const observations = await Promise.all(context.previews.map(probeTemplate));
-        await saveJson(path.join(jobDir, "previews.json"), observations);
-      },
-      async commitRuntime(appDir) {
-        const destination = path.join(dataDir, "releases", context.runtimeId);
-        const staging = path.join(workDir, "release");
-        await mkdir(staging);
-        await Promise.all([cp(sourceRoot, path.join(staging, "source"), { recursive: true, verbatimSymlinks: true }),
-          cp(appDir, path.join(staging, "app"), { recursive: true, verbatimSymlinks: true })]);
-        await saveJson(path.join(staging, "app/runtime.json"), { runtimeId: context.runtimeId, jobId: job._id,
-          runtimeSourceCommit: context.plan.runtimeSourceCommit, templateSources: context.plan.templateSources, buildConfig: context.buildConfig });
-        await mkdir(path.dirname(destination), { recursive: true });
-        await rename(staging, destination);
-        return { runtimeId: context.runtimeId, appDir: path.join(destination, "app"), sourceRoot: path.join(destination, "source"),
-          runtimeSourceCommit: context.plan.runtimeSourceCommit, templateSources: context.plan.templateSources, buildConfig: context.buildConfig };
-      },
-      success(extra = {}) { return { status: "SUCCEEDED", runtimeId: context.runtimeId, merchantResults,
-        previousPublishIds: context.previousPublishIds, ...extra }; },
-    };
-    let result;
-    let confirmed = false;
+  async function maintenance(observation = {}) {
+    let activeRuntimeId = observation.activeRuntimeId;
+    if (!Object.hasOwn(observation, "activeRuntimeId")) {
+      try { activeRuntimeId = (await api("GET", "/site-runtime")).activeRuntime?.runtimeId ?? null; }
+      catch (error) { logger.error(`Cleanup confirmation unavailable: ${error.message}`); }
+    }
     try {
+      // Only our terminal summaries written after child exit prove abandoned work is idle.
+      const executions = path.join(dataDir, "executions");
       try {
-        await mkdir(jobDir, { recursive: true });
-        await saveJson(path.join(jobDir, "request.json"), job);
-        if (job.kind === "APPLY_TEMPLATE") result = await applyTemplate(context);
-        else if (job.kind === "INITIALIZE_SITE") result = await initializeSite(context);
-        else if (job.kind === "PUBLISH_SITE") result = await publishSite(context);
-        else if (job.kind === "SWITCH_TEMPLATE") result = await switchTemplate(context);
-        else if (job.kind === "ROLLBACK_SITE_ARTIFACT") result = await rollbackSiteArtifact(context);
-        else if (job.kind === "ROLLBACK_RUNTIME") result = await rollbackRuntime(context);
-        else throw new Error(`Unsupported local job kind: ${job.kind}`);
-      } catch (error) {
-        if (error.awaitingConfirmation) throw error;
-        result = { status: "FAILED", runtimeId: context.runtimeId, merchantResults,
-          previousPublishIds: context.previousPublishIds, error: diagnostic(error) };
+        const rootInfo = await lstat(executions);
+        if (rootInfo.isDirectory() && !rootInfo.isSymbolicLink()) {
+          for (const entry of await readdir(executions, { withFileTypes: true })) {
+            if (!entry.isDirectory() || !safeId.test(entry.name) || activeRequests.has(entry.name)) continue;
+            const filename = path.join(executions, entry.name, "result.json");
+            try {
+              const info = await lstat(filename);
+              if (!info.isFile() || info.isSymbolicLink()) continue;
+              const result = await json(filename);
+              if (result.requestId === entry.name && result.childrenExited === true &&
+                ["SUCCEEDED", "FAILED", "SKIPPED"].includes(result.status) && Number.isFinite(Date.parse(result.endedAt))) stoppedRequests.add(entry.name);
+            } catch (error) { if (error.code !== "ENOENT") logger.error(`Work exit evidence unavailable: ${filename}; ${error.message}`); }
+          }
+        }
+      } catch (error) { if (error.code !== "ENOENT") logger.error(`Work exit evidence unavailable: ${executions}; ${error.message}`); }
+      return await cleanup({ localDataDir: dataDir, activeRuntimeId,
+        runningRuntimeIds: [runtime.getCurrent()?.runtimeId].filter(Boolean), inFlightRuntimeIds: [...inFlightRuntimes],
+        runtimeFacts: [...runtimeFacts.values()], activeRequestIds: [...activeRequests], stoppedRequestIds: [...stoppedRequests], logger });
+    } catch (error) { logger.error(`Cleanup failed: ${dataDir}; ${error.message}`); return { errors: [{ path: dataDir, message: error.message }] }; }
+  }
+  function formalSite(site) {
+    if (!site || !isMerchantId(site.merchantId) || !safeId.test(site.templateId || "") ||
+      typeof site.contentRevision !== "string" || !site.contentRevision || !site.document ||
+      typeof site.document !== "object" || Array.isArray(site.document)) throw new Error("Invalid formal merchant response");
+    const url = new URL(site.siteUrl);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash ||
+      url.hostname !== site.hostname) throw new Error("Formal merchant canonical URL mismatch");
+    return { merchantId: site.merchantId, siteId: site.merchantId, templateId: site.templateId,
+      siteUrl: site.siteUrl, hostname: site.hostname, state: site.state, contentRevision: site.contentRevision,
+      document: normalizeMerchantDocument({ merchantId: site.merchantId, document: site.document }) };
+  }
+  const execute = async (request, { signal, onProgress = () => {} } = {}) => {
+    if (!safeId.test(request.requestId || "") || !["APPLY_TEMPLATE", "PUBLISH_SITE"].includes(request.kind)) throw new Error("Invalid execution request");
+    const requestId = request.requestId, startedAt = new Date().toISOString();
+    const jobDir = path.join(dataDir, "executions", requestId), workDir = path.join(dataDir, "work", requestId);
+    const inputDir = path.join(workDir, "input"), sourceRoot = path.join(workDir, "source");
+    const resultFile = path.join(workDir, "build-result.json"), logFile = path.join(jobDir, "build.log");
+    const artifactDir = path.join(dataDir, "artifacts");
+    const merchantResults = [];
+    let stage = "precondition", activeRuntimeId, context, result;
+    let runtimeId = request.kind === "APPLY_TEMPLATE" ? requestId : undefined;
+    activeRequests.add(requestId);
+    const progress = async value => { stage = value; onProgress(value); logger.log(`Build ${requestId}: ${value}`); };
+    const callApi = async (method, route, body) => { assertRunning(signal); return api(method, route, body, { signal }); };
+    const run = async (...args) => { assertRunning(signal); return runner(...args); };
+    const summary = () => ({ requestId, kind: request.kind, target: request.target, startedAt, endedAt: new Date().toISOString(), stage,
+      runtimeId, childrenExited: true, runtimeSourceCommit: context?.plan?.runtimeSourceCommit,
+      templateSources: context?.plan?.templateSources, merchantResults,
+      previews: { verified: context?.verifiedPreviews || 0 }, ...result });
+    try {
+      await mkdir(jobDir, { recursive: true });
+      await rm(path.join(jobDir, "result.json"), { force: true });
+      await mkdir(inputDir, { recursive: true });
+      const [environment, catalog] = await Promise.all([callApi("GET", "/site-runtime"), callApi("GET", "/internal/sites")]);
+      activeRuntimeId = environment.activeRuntime?.runtimeId ?? null;
+      if (!Array.isArray(catalog.sites)) throw new Error("Invalid formal merchant catalog");
+      const rawSites = request.kind === "APPLY_TEMPLATE" ? catalog.sites : catalog.sites.filter(site => site.merchantId === request.target.merchantId);
+      if (request.kind === "PUBLISH_SITE") {
+        if (!isMerchantId(request.target.merchantId) || Object.keys(request.target).join(",") !== "merchantId") throw new Error("PUBLISH_SITE requires only merchantId");
+        if (rawSites.length !== 1) throw new Error("Merchant has no formal content");
+        if (!environment.activeRuntime || runtime.getCurrent()?.runtimeId !== activeRuntimeId) {
+          throw Object.assign(new Error("Start the confirmed runtime or apply a new package before publishing"), { code: "RUNTIME_NOT_READY" });
+        }
+        await checkRuntime(environment.activeRuntime);
+        runtimeId = activeRuntimeId;
       }
-      await saveJson(path.join(jobDir, "result.json"), result);
-      confirmed = true;
-      return result;
+      inFlightRuntimes.add(runtimeId);
+      const sites = structuredClone(rawSites.map(formalSite));
+      const job = { ...request, _id: requestId, input: { sites, runtime: environment.activeRuntime } };
+      merchantResults.push(...sites.map(site => ({ merchantId: site.merchantId, templateId: site.templateId,
+        contentRevision: site.contentRevision, validated: false, uploaded: 0, deleted: 0, distributed: false, verified: false })));
+      context = { api: callApi, rpc: callApi, runtime, job, settings, dataDir, jobDir, workDir, inputDir, sourceRoot,
+        resultFile, artifactDir, merchantResults, runtimeId, logger, progress, planRuntimeSource, planContentSource,
+        buildConfig: { ...defaultBuildConfig }, publications: [], previews: [], verifiedPreviews: 0,
+        async setInput(patch) { context.execution = { ...context.execution, ...patch }; },
+        async confirmRuntime(current) {
+          const body = { expectedRuntimeId: job.input.runtime?.runtimeId ?? null, current,
+            expectedSites: sites.map(site => ({ merchantId: site.merchantId, templateId: site.templateId, state: site.state, contentRevision: site.contentRevision })) };
+          try {
+            const confirmed = await callApi("POST", "/internal/site-runtime/confirm", body);
+            if (confirmed.activeRuntime?.runtimeId !== current.runtimeId) throw new Error("Confirmation response identity mismatch");
+            activeRuntimeId = current.runtimeId;
+            return confirmed;
+          } catch (error) {
+            if (error.status >= 400 && error.status < 500) {
+              error.confirmation = "rejected";
+              throw error;
+            }
+            // A single observation can confirm success, never prove a timed-out write cannot arrive later.
+            activeRuntimeId = undefined;
+            try {
+              const observed = await api("GET", "/site-runtime");
+              if (observed.activeRuntime?.runtimeId === current.runtimeId) { activeRuntimeId = current.runtimeId; return observed; }
+            } catch { /* Keep the outcome unknown; do not retry. */ }
+            throw Object.assign(error, { confirmation: "unknown" });
+          }
+        },
+        async prepareSource(plan) {
+          context.plan = plan;
+          if (plan.kind === "content") {
+            const deployed = await json(path.join(job.input.runtime.appDir, "runtime.json"));
+            if (deployed.runtimeId !== runtimeId || !deployed.buildConfig) throw new Error("Deployed runtime build configuration is unavailable");
+            context.buildConfig = Object.fromEntries(Object.keys(defaultBuildConfig).map(key => [key, deployed.buildConfig[key]]));
+          }
+          await prepareSourceSnapshot({ plan, sourceRoot, temporaryRoot: workDir });
+          await run("corepack", ["pnpm", "install", "--frozen-lockfile", "--offline", "--reporter=silent"], sourceRoot,
+            { ...process.env, ...settings.env, CI: "true", NODE_ENV: "development" }, { logFile });
+          context.modules = await import(pathToFileURL(path.join(sourceRoot, "scripts/install-template.mjs")).href);
+          context.content = await import(pathToFileURL(path.join(sourceRoot, "src/server/site-input.mjs")).href);
+        },
+        async validate(site) {
+          const entry = merchantResults.find(item => item.merchantId === site.merchantId);
+          try {
+            const document = await context.content.validateSiteInput({ sourceRoot, templateId: site.templateId, document: site.document,
+              identity: { siteId: site.siteId, templateId: site.templateId, siteUrl: site.siteUrl } });
+            entry.validated = true;
+            return { ...site, document };
+          } catch (error) { entry.error = diagnostic(error); throw error; }
+        },
+        async writeInputs(selected) {
+          await saveJson(path.join(inputDir, "sites.json"), selected.map(site => ({ id: site.siteId, templateId: site.templateId,
+            hostname: site.hostname, siteUrl: site.siteUrl, contentRevision: site.contentRevision, contentFile: `sites/${site.siteId}/current.json` })));
+          await Promise.all(selected.map(site => saveJson(path.join(inputDir, "sites", site.siteId, "current.json"), site.document)));
+          context.previews = await context.modules.preparePreviewInputs({ sourceRoot, inputDir,
+            port: Number(context.buildConfig.SITE_PORT), previewBaseDomain: context.buildConfig.PREVIEW_BASE_DOMAIN });
+        },
+        recordPublications(publications = []) {
+          context.publications = publications;
+          for (const publication of publications) {
+            const entry = merchantResults.find(item => item.merchantId === publication.merchantId && item.templateId === publication.templateId);
+            if (entry) Object.assign(entry, { uploaded: publication.uploaded, deleted: publication.deleted,
+              distributed: publication.distributed === true, publishId: publication.publishId, objectPrefix: publication.objectPrefix });
+          }
+        },
+        async compile(mode, selected, output) {
+          await progress("building");
+          const args = [path.join(sourceRoot, "scripts/sites.mjs"), mode, "--all", "--input-dir", inputDir, "--work-root", workDir,
+            "--runtime-id", runtimeId, "--job-id", requestId, "--result-file", resultFile, ...(output ? ["--output", output] : [])];
+          const env = { ...process.env, ...settings.env, ...context.buildConfig, ARTIFACT_DIR: artifactDir };
+          delete env.BUILD_AUDIT_DIR;
+          delete env.PUBLISH_AUDIT_DIR;
+          if (mode === "publish") env.APP_DIR = job.input.runtime.appDir; else delete env.APP_DIR;
+          let executionError;
+          try { await run(process.execPath, args, sourceRoot, env, { logFile }); } catch (error) { executionError = error; }
+          let built;
+          try { built = await json(resultFile); } catch (error) { throw executionError || error; }
+          context.recordPublications(built.publications);
+          if (executionError || built.error) {
+            const error = executionError || new Error(built.error);
+            Object.assign(error, { phase: built.phase || "building", objectPath: built.objectPath, partial: built.partial,
+              code: built.code || error.code });
+            if (built.error) error.message = built.error;
+            throw error;
+          }
+          if (built.runtimeId !== runtimeId || built.jobId !== requestId || context.publications.length !== selected.length) throw new Error("Build result identity or merchant count differs from fixed input");
+          const seen = new Set();
+          for (const publication of context.publications) {
+            const site = selected.find(item => item.siteId === publication.siteId && item.merchantId === publication.merchantId);
+            if (!site || seen.has(site.siteId)) throw new Error("Duplicate or unexpected built merchant");
+            const expected = { runtimeId, merchantId: site.merchantId, siteId: site.siteId, templateId: site.templateId,
+              publishId: requestId, jobId: requestId, contentRevision: site.contentRevision };
+            if (Object.entries(expected).some(([key, value]) => publication[key] !== value) || !publication.distributed) throw new Error("Publication identity or content revision differs from fixed input");
+            seen.add(site.siteId);
+          }
+          return built;
+        },
+        async activate(site) {
+          await progress("activating");
+          await callApi("POST", `/internal/sites/${site.merchantId}/activate`, {
+            expectedRuntimeId: runtimeId, expectedTemplateId: site.templateId, expectedContentRevision: site.contentRevision, expectedState: "INITIALIZING" });
+          merchantResults.find(item => item.merchantId === site.merchantId).activated = true;
+        },
+        async verifySites(selected) {
+          for (const site of selected) {
+            const publication = context.publications.find(item => item.merchantId === site.merchantId && item.templateId === site.templateId);
+            if (!publication) throw new Error(`Missing published merchant: ${site.merchantId}`);
+            const entry = merchantResults.find(item => item.merchantId === site.merchantId);
+            try {
+              const checked = await probeSite({ site, publication, runtimeId });
+              entry.verified = true;
+              entry.verification = { routes: checked.routes?.length || 0, assets: checked.assets?.length || 0, rsc: checked.rsc?.length || 0 };
+            } catch (error) { entry.error = diagnostic(error); throw error; }
+          }
+        },
+        async verifyPreviews() { context.verifiedPreviews = (await Promise.all(context.previews.map(probeTemplate))).length; },
+        async commitRuntime(appDir) {
+          const destination = path.join(dataDir, "releases", runtimeId), staging = path.join(workDir, "release");
+          await mkdir(staging);
+          const copied = await Promise.allSettled([cp(sourceRoot, path.join(staging, "source"), { recursive: true, verbatimSymlinks: true }),
+            cp(appDir, path.join(staging, "app"), { recursive: true, verbatimSymlinks: true })]);
+          for (const copy of copied) if (copy.status === "rejected") throw copy.reason;
+          const fact = { runtimeId, runtimeSourceCommit: context.plan.runtimeSourceCommit, templateSources: context.plan.templateSources, buildConfig: context.buildConfig };
+          await saveJson(path.join(staging, "app/runtime.json"), { ...fact, jobId: requestId });
+          await mkdir(path.dirname(destination), { recursive: true });
+          await rename(staging, destination);
+          return { ...fact, appDir: path.join(destination, "app"), sourceRoot: path.join(destination, "source") };
+        },
+        recordRuntimeFact(fact) { runtimeFacts.set(fact.runtimeId, fact); },
+        success(extra = {}) { return { status: "SUCCEEDED", ...extra }; },
+      };
+      result = request.kind === "APPLY_TEMPLATE" ? await applyTemplate(context) : await publishSite(context);
     } catch (error) {
-      await saveJson(path.join(jobDir, "result.json"), { status: "FAILED", error: diagnostic(error), runtimeId: context.runtimeId });
-      throw error;
+      if (!error.phase) error.phase = stage;
+      if (error.partial === undefined) error.partial = context?.publications.some(item => item.uploaded > 0 || item.deleted > 0) || false;
+      result = { status: "FAILED", error: diagnostic(error) };
+      // A never-started candidate cannot have been confirmed by this execution.
+      if (request.kind === "APPLY_TEMPLATE" && (!context || !context.candidateStarted) && error.processState !== "unknown" && activeRuntimeId !== undefined) {
+        runtimeFacts.set(runtimeId, { runtimeId, disposition: "abandoned", stopped: true, confirmation: "known" });
+      }
     } finally {
-      if (confirmed) {
-        try { await rm(workDir, { recursive: true, force: true }); }
-        catch (error) { logger.error(`Temporary work cleanup skipped: ${workDir}; ${error.message}`); }
+      const completed = summary();
+      try { await saveJson(path.join(jobDir, "result.json"), completed); }
+      finally {
+        activeRequests.delete(requestId);
+        stoppedRequests.add(requestId);
+        inFlightRuntimes.delete(runtimeId);
+        const cleaned = await maintenance({ activeRuntimeId });
+        if (cleaned.errors?.length) {
+          completed.cleanupWarnings = cleaned.errors;
+          await saveJson(path.join(jobDir, "result.json"), completed);
+        }
+        result = completed;
       }
     }
+    return result;
   };
+  execute.maintenance = maintenance;
+  return execute;
 }
