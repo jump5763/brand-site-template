@@ -101,6 +101,20 @@ test("incomplete response collections reject before any upload", async t => {
   }
 });
 
+test("noncanonical response keys are rejected before any upload", async t => {
+  for (const suffix of ["/../a10", "/./menu", "/nested//page", "/nested\\page", "/nul\0page"]) {
+    const options = await fixture(t);
+    const manifestFile = path.join(options.nextDir, "prerender-manifest.json");
+    const manifest = await json(manifestFile);
+    manifest.routes["/sites/a/a1" + suffix] = {};
+    await writeFile(manifestFile, JSON.stringify(manifest));
+    let writes = 0;
+    await assert.rejects(publishFiles({ ...options, jobId: "invalid-key", copy: async () => { writes++; }, write: async () => { writes++; } }), /Invalid response cache key/);
+    assert.equal(writes, 0);
+    await assert.rejects(access(options.artifactDir), { code: "ENOENT" });
+  }
+});
+
 test("response difference removes deleted pages and stale segments only under the exact merchant prefix", async t => {
   const options = await fixture(t);
   await seedArtifacts(options.nextDir, { id: "a10" });

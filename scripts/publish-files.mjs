@@ -33,6 +33,9 @@ async function collectSite({ site, appRoot, available, prerender, runtimeId, pub
   const metadata = new Map();
   const routes = [];
   for (const cacheKey of keys) {
+    if (/[\\\0]/.test(cacheKey) || cacheKey.split("/").some((part) => !part || part === "." || part === "..")) {
+      throw new Error(`Invalid response cache key: ${cacheKey}`);
+    }
     const page = available.has(`${cacheKey}.html`);
     const body = available.has(`${cacheKey}.body`);
     if (page === body) throw new Error(`Missing or ambiguous prerendered response: ${cacheKey}`);
