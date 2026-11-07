@@ -1,200 +1,202 @@
 import assert from "node:assert/strict";
 import test, { after } from "node:test";
 import fs from "node:fs/promises";
-import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { sourceFixture } from "./helpers/source-fixture.mjs";
+import { seedArtifacts, put } from "./helpers/artifacts.mjs";
+import { publishFiles } from "../scripts/publish-files.mjs";
+import { createArtifactServer, listen } from "../scripts/local-services.mjs";
+import nodeFsModule from "next/dist/server/lib/node-fs-methods.js";
 const source = await sourceFixture({ after });
 await fs.copyFile(new URL("../cache-handler.cjs", import.meta.url), path.join(source.root, "cache-handler.cjs"));
 await fs.symlink(path.resolve("node_modules"), path.join(source.root, "node_modules"), "dir");
 const Cache = createRequire(import.meta.url)(path.join(source.root, "cache-handler.cjs"));
-import nodeFsModule from "next/dist/server/lib/node-fs-methods.js";
-
 const { nodeFs } = nodeFsModule;
-const key = "sites/a/site-one";
-const runtimeId = "runtime-one";
-const prefix = `runtimes/${runtimeId}/${key}`;
-const pageData = (value) => ({ kind: "APP_PAGE", html: `<h1>${value}</h1>`, rscData: Buffer.from(`rsc:${value}`),
+const key = "sites/a/site-one", runtimeId = "runtime-one";
+const prefix = `runtimes/${runtimeId}/${key}/responses`;
+const pageData = value => ({ kind: "APP_PAGE", html: `<h1>${value}</h1>`, rscData: Buffer.from(`rsc:${value}`),
   status: 200, headers: { "content-type": "text/html" }, segmentData: new Map([["/_tree", Buffer.from(`tree:${value}`)]]) });
-
-async function write(root, file, value) {
-  const destination = path.join(root, file);
-  await fs.mkdir(path.dirname(destination), { recursive: true });
-  await fs.writeFile(destination, value);
-}
+async function write(root, file, value) { await put(root, file, value); }
 
 async function fixture(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cache-release-test-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cache-route-test-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const remote = path.join(root, "artifacts");
-  const requests = [];
-  const faults = { offline: false, file: null };
-  const server = http.createServer(async (req, res) => {
-    const file = new URL(req.url, "http://fixture.local").pathname.slice(1).split("/").map(decodeURIComponent).join("/");
-    requests.push(file);
-    if (faults.offline || file === faults.file) { res.writeHead(503); res.end("injected failure"); return; }
-    try { const bytes = await fs.readFile(path.join(remote, file)); res.writeHead(200); res.end(bytes); }
-    catch { res.writeHead(404); res.end(); }
-  });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  t.after(() => new Promise((resolve) => server.close(resolve)));
-  const before = Object.fromEntries(["ARTIFACT_BASE_URL", "RUNTIME_ID", "BRAND_SITE_BUILDING"].map((name) => [name, process.env[name]]));
+  const remote = path.join(root, "artifacts"), nextDir = path.join(root, "next"), requests = [];
+  const faults = { offline: false, file: null, status: 503, timeout: false };
+  const server = createArtifactServer({ artifactDir: remote, onRequest: (method, url) => requests.push(`${method} ${decodeURIComponent(url).slice(1)}`) });
+  await listen(server, 0);
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const before = Object.fromEntries(["ARTIFACT_BASE_URL", "RUNTIME_ID", "BRAND_SITE_BUILDING"].map(name => [name, process.env[name]]));
   process.env.ARTIFACT_BASE_URL = `http://127.0.0.1:${server.address().port}`;
   process.env.RUNTIME_ID = runtimeId;
   delete process.env.BRAND_SITE_BUILDING;
   t.after(() => { for (const [name, value] of Object.entries(before)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
   const context = { fs: nodeFs, serverDistDir: path.join(root, ".next/server"), flushToDisk: true, revalidatedTags: [] };
-  const cache = () => new Cache(context);
-  const current = async (publishId) => write(remote, `${prefix}/current.json`, JSON.stringify({ runtimeId, templateId: "a", siteId: "site-one", publishId, jobId: `job-${publishId}` }));
-  const publish = async (publishId, value, routes = [{ cacheKey: key, kind: "APP_PAGE" }, { cacheKey: `${key}/robots.txt`, kind: "APP_ROUTE" }]) => {
-    const manifest = { runtimeId, templateId: "a", siteId: "site-one", publishId, routes: [] };
-    for (const route of routes) {
-      const headers = { "content-type": route.kind === "APP_PAGE" ? "text/html" : "text/plain",
-        "X-Brand-Site-Runtime-Id": runtimeId, "X-Brand-Site-Publish-Id": publishId };
-      const metadata = { headers, status: 200, ...(route.kind === "APP_PAGE" ? { segmentPaths: ["/_tree"] } : {}) };
-      const files = { [`${route.cacheKey}.meta`]: JSON.stringify(metadata) };
-      if (route.kind === "APP_PAGE") Object.assign(files, { [`${route.cacheKey}.html`]: `<h1>${value}</h1>`, [`${route.cacheKey}.rsc`]: `rsc:${value}`, [`${route.cacheKey}.segments/_tree.segment.rsc`]: `tree:${value}` });
-      else files[`${route.cacheKey}.body`] = value;
-      await Promise.all(Object.entries(files).map(([file, bytes]) => write(remote, `${prefix}/releases/${publishId}/responses/${file}`, bytes)));
-      manifest.routes.push({ ...route, path: route.cacheKey.slice(key.length) || "/", files: Object.keys(files) });
-    }
-    await write(remote, `${prefix}/releases/${publishId}/manifest.json`, JSON.stringify(manifest));
-    await current(publishId);
-    return manifest;
+  const cache = () => {
+    const handler = new Cache(context), request = handler.request.bind(handler);
+    handler.request = async (file, options) => {
+      if (faults.timeout) throw new DOMException("injected request timeout", "TimeoutError");
+      if (faults.offline || file === faults.file) throw new Error(`HTTP ${faults.status}: injected failure`);
+      return request(file, options);
+    };
+    return handler;
   };
-  return { root, remote, requests, faults, context, cache, publish, current,
-    localRelease: (publishId) => path.join(root, ".next/cache/brand-site-artifacts", runtimeId, key, "releases", publishId) };
+  const publish = async (publishId, value, pages = ["", "/menu"]) => {
+    await seedArtifacts(nextDir, { id: "site-one", templateId: "a", value, pages });
+    return publishFiles({ nextDir, artifactDir: remote, runtimeId, jobId: publishId, sites: [{ id: "site-one", templateId: "a" }] });
+  };
+  const currentFiles = async () => (await fs.readdir(path.join(root, ".next/cache/brand-site-artifacts"), { recursive: true }))
+    .filter(name => name.endsWith(".cache")).map(name => path.join(root, ".next/cache/brand-site-artifacts", name));
+  return { root, remote, nextDir, requests, faults, context, cache, publish, currentFiles };
 }
 
-test("immutable groups reuse files, follow consecutive publication IDs and roll back without timestamp ordering", async (t) => {
+test("route cache reads complete native response values and reuses unchanged ETags across handlers", async t => {
   const f = await fixture(t);
   await write(f.root, `.next/server/app/${key}.html`, "stale native output");
-  await f.publish("publish-1", "one");
+  await f.publish("one", "one");
   const first = await f.cache().get(key, { kind: "APP_PAGE" });
   assert.equal(first.value.html, "<h1>one</h1>");
   assert.equal(first.value.rscData.toString(), "rsc:one");
-  assert.equal(first.value.segmentData.get("/_tree").toString(), "tree:one");
-  assert.equal(first.value.headers["X-Brand-Site-Publish-Id"], "publish-1");
+  assert.equal(first.value.segmentData.get("/_tree").toString(), "/_tree:one");
   assert.equal((await f.cache().get(`${key}/robots.txt`, { kind: "APP_ROUTE" })).value.body.toString(), "one");
   const before = f.requests.length;
   assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
-  assert.deepEqual(f.requests.slice(before), [`${prefix}/current.json`]);
-  await f.publish("publish-2", "two");
-  const second = await f.cache().get(key, { kind: "APP_PAGE" });
-  assert.equal(second.value.html, "<h1>two</h1>");
-  assert.equal(second.value.rscData.toString(), "rsc:two");
-  assert.equal(second.value.headers["X-Brand-Site-Publish-Id"], "publish-2");
-  await f.current("publish-1");
-  assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
+  assert.deepEqual(f.requests.slice(before), [`HEAD ${prefix}/${key}.meta`]);
+  assert.equal(f.requests.some(r => r.includes("/menu")), false);
+  assert.equal(f.requests.some(r => /manifest|current.json|releases/.test(r)), false);
   assert.equal(await fs.readFile(path.join(f.root, `.next/server/app/${key}.html`), "utf8"), "stale native output");
 });
 
-test("an unpublished page repeatedly misses and generated page, route and null writes remain transient", async (t) => {
+test("complete overwrites refresh RSC and body even when HTML and metadata bytes are unchanged", async t => {
   const f = await fixture(t);
-  await f.publish("publish-1", "one");
-  const fresh = `${key}/new-page`;
+  await f.publish("same", "one");
   const cache = f.cache();
+  await cache.get(key, { kind: "APP_PAGE" });
+  await cache.get(`${key}/robots.txt`, { kind: "APP_ROUTE" });
+  for (let i = 0; i < 4; i++) {
+    await write(f.nextDir, `server/app/${key}.rsc`, `updated-${i}`);
+    await write(f.nextDir, `server/app/${key}/robots.txt.body`, `body-${i}`);
+    await publishFiles({ nextDir: f.nextDir, artifactDir: f.remote, runtimeId, jobId: "same", sites: [{ id: "site-one", templateId: "a" }] });
+    const page = await cache.get(key, { kind: "APP_PAGE" });
+    assert.equal(page.value.html, "<h1>one</h1>");
+    assert.equal(page.value.rscData.toString(), `updated-${i}`);
+    assert.equal((await cache.get(`${key}/robots.txt`, { kind: "APP_ROUTE" })).value.body.toString(), `body-${i}`);
+  }
+  assert.equal((await f.currentFiles()).length, 2);
+});
+
+test("unpublished routes miss and merchant realtime page, route and null writes remain transient", async t => {
+  const f = await fixture(t), fresh = `${key}/fresh`, cache = f.cache();
+  await f.publish("one", "one");
   assert.equal(await cache.get(fresh, { kind: "APP_PAGE" }), null);
   await cache.set(fresh, pageData("generated"), {});
-  await cache.set(`${fresh}/route`, { kind: "APP_ROUTE", body: Buffer.from("generated"), headers: {}, status: 200 }, {});
+  await cache.set(`${fresh}/route`, { kind: "APP_ROUTE", body: Buffer.from("generated") }, {});
   await cache.set(fresh, null, { cacheControl: { revalidate: false } });
   assert.equal(await f.cache().get(fresh, { kind: "APP_PAGE" }), null);
   await assert.rejects(fs.access(path.join(f.root, `.next/server/app/${fresh}.html`)), { code: "ENOENT" });
-  await assert.rejects(fs.access(path.join(f.root, `.next/server/app/${fresh}/route.body`)), { code: "ENOENT" });
-  assert.equal(await cache.get("sites/a/unpublished", { kind: "APP_PAGE" }), null);
-  await f.publish("publish-2", "published", [{ cacheKey: key, kind: "APP_PAGE" }, { cacheKey: fresh, kind: "APP_PAGE" }]);
+  await f.publish("two", "published", ["", "/fresh"]);
   assert.equal((await f.cache().get(fresh, { kind: "APP_PAGE" })).value.html, "<h1>published</h1>");
 });
 
-test("confirmed deletion and missing current block old responses across new handler instances", async (t) => {
+test("only confirmed meta absence cancels fallback, including deletion between HEAD and GET", async t => {
   const f = await fixture(t);
-  await f.publish("publish-1", "one");
+  await f.publish("one", "one");
+  await f.cache().get(`${key}/menu`, { kind: "APP_PAGE" });
+  await f.publish("two", "two", [""]);
+  assert.equal(await f.cache().get(`${key}/menu`, { kind: "APP_PAGE" }), null);
+  f.faults.offline = true;
+  assert.equal(await f.cache().get(`${key}/menu`, { kind: "APP_PAGE" }), null);
+  f.faults.offline = false;
   await f.cache().get(key, { kind: "APP_PAGE" });
-  await f.publish("publish-2", "two", [{ cacheKey: `${key}/robots.txt`, kind: "APP_ROUTE" }]);
-  assert.equal(await f.cache().get(key, { kind: "APP_PAGE" }), null);
+  await f.publish("three", "three");
+  const cache = f.cache(), request = cache.request.bind(cache);
+  cache.request = async (file, options) => {
+    const response = await request(file, options);
+    if (options?.method === "HEAD") await fs.rm(path.join(f.remote, prefix, `${key}.meta`));
+    return response;
+  };
+  assert.equal(await cache.get(key, { kind: "APP_PAGE" }), null);
   f.faults.offline = true;
   assert.equal(await f.cache().get(key, { kind: "APP_PAGE" }), null);
-  assert.equal((await f.cache().get(`${key}/robots.txt`, { kind: "APP_ROUTE" })).value.body.toString(), "one");
-  f.faults.offline = false;
-  await f.publish("publish-3", "three");
-  f.faults.file = `${prefix}/releases/publish-3/responses/${key}.html`;
-  assert.equal(await f.cache().get(key, { kind: "APP_PAGE" }), null);
-  f.faults.offline = true;
-  assert.equal(await f.cache().get(key, { kind: "APP_PAGE" }), null);
-  f.faults.offline = false;
-  f.faults.file = null;
-  assert.equal((await f.cache().get(key, { kind: "APP_PAGE" })).value.html, "<h1>three</h1>");
-  await fs.rm(path.join(f.remote, `${prefix}/current.json`));
-  assert.equal(await f.cache().get(`${key}/robots.txt`, { kind: "APP_ROUTE" }), null);
-  f.faults.offline = true;
-  assert.equal(await f.cache().get(`${key}/robots.txt`, { kind: "APP_ROUTE" }), null);
 });
 
-test("partial downloads preserve complete prior groups, clean staging files and retry", async (t) => {
+test("attachment 404, HTTP failures, timeout and malformed metadata preserve warm responses but cold reads miss", async t => {
   const f = await fixture(t);
-  await f.publish("publish-1", "one");
+  await f.publish("one", "one");
   const first = await f.cache().get(key, { kind: "APP_PAGE" });
-  await f.publish("publish-2", "two");
-  f.faults.file = `${prefix}/releases/publish-2/responses/${key}.segments/_tree.segment.rsc`;
+  await f.publish("two", "two");
+  const attachment = path.join(f.remote, prefix, `${key}.segments/_tree.segment.rsc`);
+  await fs.rm(attachment);
   assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
-  await assert.rejects(fs.access(f.localRelease("publish-2")), { code: "ENOENT" });
-  const releases = path.dirname(f.localRelease("publish-1"));
-  assert.deepEqual(await fs.readdir(releases), ["publish-1"]);
-  assert.equal(await fs.readFile(path.join(f.localRelease("publish-1"), `responses/${key}.rsc`), "utf8"), "rsc:one");
-  f.faults.file = null;
-  assert.equal((await f.cache().get(key, { kind: "APP_PAGE" })).value.html, "<h1>two</h1>");
+  await write(f.remote, `${prefix}/${key}.segments/_tree.segment.rsc`, "fixed-segment");
+  for (const status of [403, 500, 503]) {
+    f.faults.status = status; f.faults.offline = true;
+    assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
+    assert.equal(await f.cache().get(`${key}/menu`, { kind: "APP_PAGE" }), null);
+  }
+  f.faults.offline = false; f.faults.timeout = true;
+  assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
+  assert.equal(await f.cache().get(`${key}/menu`, { kind: "APP_PAGE" }), null);
+  f.faults.timeout = false;
+  await write(f.remote, `${prefix}/${key}.meta`, "invalid-json");
+  assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
+  await f.publish("three", "three");
+  assert.equal((await f.cache().get(key, { kind: "APP_PAGE" })).value.html, "<h1>three</h1>");
   f.faults.offline = true;
-  assert.equal((await f.cache().get(key, { kind: "APP_PAGE" })).value.rscData.toString(), "rsc:two");
-  await fs.rm(path.join(f.localRelease("publish-2"), `responses/${key}.rsc`));
+  await fs.rm((await f.currentFiles())[0]);
   assert.equal(await f.cache().get(key, { kind: "APP_PAGE" }), null);
 });
 
-test("a failed local directory commit cannot expose a partial release", async (t) => {
+test("failed cache commit leaves the previous complete response and ETag usable", async t => {
   const f = await fixture(t);
-  await f.publish("publish-1", "one");
+  await f.publish("one", "one");
   const first = await f.cache().get(key, { kind: "APP_PAGE" });
-  await f.publish("publish-2", "two");
+  await f.publish("two", "two");
   const original = fs.rename;
   const fault = t.mock.method(fs, "rename", async (...args) => {
-    if (args[1] === f.localRelease("publish-2")) throw Object.assign(new Error("injected commit failure"), { code: "ENOSPC" });
+    if (args[1].endsWith(".cache")) throw new Error("injected cache commit failure");
     return original(...args);
   });
   assert.deepEqual(await f.cache().get(key, { kind: "APP_PAGE" }), first);
   fault.mock.restore();
-  assert.deepEqual(await fs.readdir(path.dirname(f.localRelease("publish-1"))), ["publish-1"]);
+  assert.equal((await f.currentFiles()).length, 1);
   assert.equal((await f.cache().get(key, { kind: "APP_PAGE" })).value.html, "<h1>two</h1>");
+  const files = await fs.readdir(path.join(f.root, ".next/cache/brand-site-artifacts"), { recursive: true });
+  assert.equal(files.some(name => name.endsWith(".tmp")), false);
 });
 
-test("a pointer change during download cannot mix publications and peer handlers wait for the group", async (t) => {
+test("GET metadata ETag wins a HEAD race and peer handlers avoid redundant route downloads", async t => {
   const f = await fixture(t);
-  await f.publish("publish-1", "one");
-  let enter;
-  let release;
-  const entered = new Promise((resolve) => { enter = resolve; });
-  const gate = new Promise((resolve) => { release = resolve; });
-  const cache = f.cache();
-  const request = cache.request.bind(cache);
-  cache.request = async (...args) => {
-    const response = await request(...args);
-    if (args[0] === `${prefix}/releases/publish-1/manifest.json`) { enter(); await gate; }
+  await f.publish("one", "one");
+  const cache = f.cache(), request = cache.request.bind(cache);
+  let changed = false;
+  cache.request = async (file, options) => {
+    const response = await request(file, options);
+    if (!changed && options?.method === "HEAD") { changed = true; await f.publish("two", "two"); }
     return response;
   };
-  const pending = cache.get(key, { kind: "APP_PAGE" });
-  await entered;
-  await f.publish("publish-2", "two");
-  const peer = f.cache().get(key, { kind: "APP_PAGE" });
-  release();
-  const [first, second] = await Promise.all([pending, peer]);
-  assert.equal(first.value.html, "<h1>one</h1>");
-  assert.equal(first.value.rscData.toString(), "rsc:one");
-  assert.equal(first.value.segmentData.get("/_tree").toString(), "tree:one");
-  assert.equal(second.value.html, "<h1>two</h1>");
-  assert.equal(second.value.rscData.toString(), "rsc:two");
-  assert.equal(f.requests.filter((file) => file === `${prefix}/current.json`).length, 2);
+  const [one, two] = await Promise.all([cache.get(key, { kind: "APP_PAGE" }), f.cache().get(key, { kind: "APP_PAGE" })]);
+  assert.equal(one.value.html, "<h1>two</h1>");
+  assert.deepEqual(two, one);
+  assert.equal(f.requests.filter(r => r === `GET ${prefix}/${key}.meta`).length, 1);
+  assert.equal(f.requests.filter(r => r === `GET ${prefix}/${key}.rsc`).length, 1);
+  const before = f.requests.length;
+  await f.cache().get(key, { kind: "APP_PAGE" });
+  assert.deepEqual(f.requests.slice(before), [`HEAD ${prefix}/${key}.meta`]);
 });
 
+test("a new process module has no persisted ETag and must synchronize again", async t => {
+  const f = await fixture(t);
+  await f.publish("one", "one");
+  await f.cache().get(key, { kind: "APP_PAGE" });
+  const require = createRequire(import.meta.url), file = path.join(source.root, "cache-handler.cjs");
+  delete require.cache[require.resolve(file)];
+  const FreshCache = require(file), before = f.requests.length;
+  assert.equal((await new FreshCache(f.context).get(key, { kind: "APP_PAGE" })).value.html, "<h1>one</h1>");
+  assert.ok(f.requests.slice(before).includes(`GET ${prefix}/${key}.meta`));
+});
 test("runtime boundaries never reuse another runtime or native merchant artifacts", async (t) => {
   const f = await fixture(t);
   await f.publish("publish-1", "one");
