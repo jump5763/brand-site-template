@@ -1,16 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, readFile, access, copyFile, readdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, access, copyFile, readdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { publishFiles } from "../scripts/publish-files.mjs";
+import { createArtifactServer, listen } from "../scripts/local-services.mjs";
 import { seedArtifacts, put } from "./helpers/artifacts.mjs";
 
 const runtimeId = "runtime-a";
 const site = { id: "a1", templateId: "a", contentRevision: "revision-one" };
 const json = async (filename) => JSON.parse(await readFile(filename, "utf8"));
+async function fixture(t) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "publish-test-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const nextDir = path.join(root, "next"), artifactDir = path.join(root, "artifacts");
+  const siteDir = path.join(artifactDir, "runtimes", runtimeId, "sites/a/a1");
+  await seedArtifacts(nextDir);
+  return { nextDir, artifactDir, siteDir, sites: [site], runtimeId };
+}
+const responsePath = (o, file) => path.join(o.siteDir, "responses/sites/a", file);
+async function httpFixture(t, options) {
+  const server = createArtifactServer({ artifactDir: options.artifactDir });
+  const port = await listen(server, 0);
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  return `http://127.0.0.1:${port}`;
+}
 
-test("empty merchant installation still distributes static assets without creating merchant pointers", async (t) => {
+test("empty merchant installation still distributes static assets without merchant state", async t => {
   const options = await fixture(t);
   const result = await publishFiles({ ...options, sites: [], jobId: "preview-only" });
   assert.deepEqual(result.publications, []);
@@ -19,110 +35,158 @@ test("empty merchant installation still distributes static assets without creati
   await assert.rejects(access(path.join(options.artifactDir, "runtimes")), { code: "ENOENT" });
 });
 
-async function fixture(t) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "publish-test-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const nextDir = path.join(root, "next");
-  const artifactDir = path.join(root, "artifacts");
-  const siteDir = path.join(artifactDir, "runtimes", runtimeId, "sites/a/a1");
-  await seedArtifacts(nextDir);
-  return { nextDir, artifactDir, siteDir, sites: [site], runtimeId };
-}
-
-test("publishes a complete immutable release after static resources, then commits only its merchant pointer", async (t) => {
-  const options = await fixture(t);
+test("fixed responses follow static assets and each route meta is last without remote manifests", async t => {
+  const options = await fixture(t), writes = [];
   await seedArtifacts(options.nextDir, { id: "a10" });
   await put(options.nextDir, "server/app/sites/a/a1/page.js", "server-only");
   await put(options.artifactDir, "_next/static/old.js", "keep");
-  const writes = [];
-  const result = await publishFiles({ ...options, jobId: "publish-first", copy: async (source, target) => {
-    writes.push(target);
-    await assert.rejects(access(path.join(options.siteDir, "current.json")), { code: "ENOENT" });
-    await copyFile(source, target);
-  } });
+  const result = await publishFiles({ ...options, jobId: "publish-first",
+    copy: async (source, target) => { writes.push(target); await copyFile(source, target); },
+    write: async (target, body) => { writes.push(target); await writeFile(target, body); },
+  });
   assert.equal(result.responses, 4);
-  const [publication] = result.publications;
-  assert.equal(publication.previous, null);
-  assert.deepEqual(publication.current, { runtimeId, templateId: "a", siteId: "a1", publishId: "publish-first", jobId: "publish-first", contentRevision: "revision-one", previous: null });
-  assert.deepEqual(await json(path.join(options.siteDir, "current.json")), publication.current);
-  assert.deepEqual(await json(path.join(publication.releaseDir, "manifest.json")), publication.manifest);
-  assert.deepEqual(publication.manifest.routes.map(({ path }) => path), ["/", "/menu", "/robots.txt", "/sitemap.xml"]);
-  for (const route of publication.manifest.routes) {
-    for (const file of route.files) await access(path.join(publication.releaseDir, "responses", file));
-    const meta = await json(path.join(publication.releaseDir, "responses", `${route.cacheKey}.meta`));
+  const [p] = result.publications;
+  assert.equal(p.distributed, true);
+  assert.equal(p.contentRevision, site.contentRevision);
+  assert.equal(p.merchantId, site.id);
+  assert.deepEqual(p.routes.map(r => r.path), ["/", "/menu", "/robots.txt", "/sitemap.xml"]);
+  for (const r of p.routes) {
+    assert.equal(r.files.at(-1), `${r.cacheKey}.meta`);
+    for (const file of r.files) await access(path.join(options.artifactDir, p.objectPrefix, file));
+    const meta = await json(path.join(options.artifactDir, p.objectPrefix, `${r.cacheKey}.meta`));
     assert.equal(meta.headers["X-Brand-Site-Runtime-Id"], runtimeId);
     assert.equal(meta.headers["X-Brand-Site-Publish-Id"], "publish-first");
+    const positions = r.files.map(file => writes.findIndex(w => w.includes(`/responses/${file}.`)));
+    assert.ok(positions.every(i => i >= 0));
+    assert.equal(positions.at(-1), Math.max(...positions));
   }
-  assert.equal(await readFile(path.join(publication.releaseDir, "responses/sites/a/a1.segments/_tree.segment.rsc"), "utf8"), "/_tree:old");
+  assert.equal(p.uploaded, p.routes.flatMap(r => r.files).length);
+  assert.deepEqual(await readdir(options.siteDir), ["responses"]);
+  for (const key of ["manifest", "current", "previous", "releaseDir"]) assert.equal(Object.hasOwn(p, key), false);
   await access(path.join(options.artifactDir, "_next/static/old.js"));
-  await assert.rejects(access(path.join(options.artifactDir, "runtimes", runtimeId, "sites/a/a10/current.json")), { code: "ENOENT" });
-  await assert.rejects(access(path.join(publication.releaseDir, "responses/sites/a/a1/page.js")), { code: "ENOENT" });
-  const firstResponse = writes.findIndex((file) => file.includes("/responses/"));
+  await assert.rejects(access(path.join(options.artifactDir, "runtimes", runtimeId, "sites/a/a10")), { code: "ENOENT" });
+  await assert.rejects(access(responsePath(options, "a1/page.js")), { code: "ENOENT" });
+  const firstResponse = writes.findIndex(file => file.includes("/responses/"));
   assert.ok(firstResponse > 0);
-  assert.ok(writes.slice(0, firstResponse).every((file) => file.includes("/_next/static/")));
-  assert.ok(writes.slice(firstResponse).every((file) => file.includes("/responses/")));
-  await assert.rejects(publishFiles({ ...options, jobId: "publish-first" }), (error) => ["EEXIST", "ENOTEMPTY"].includes(error.code));
-  assert.deepEqual(await json(path.join(options.siteDir, "current.json")), publication.current);
+  assert.ok(writes.slice(0, firstResponse).every(file => file.includes("/_next/static/")));
+  await publishFiles({ ...options, jobId: "publish-first" });
 });
 
-test("a failed copy leaves the prior pointer and complete responses intact and removes staging files", async (t) => {
+test("failed upload keeps already covered objects, skips deletion and allows full republish", async t => {
   const options = await fixture(t);
-  const prior = (await publishFiles({ ...options, jobId: "publish-first" })).publications[0];
-  await seedArtifacts(options.nextDir, { value: "new" });
-  let copies = 0;
-  await assert.rejects(publishFiles({ ...options, jobId: "publish-failed", copy: async (source, target) => {
+  await publishFiles({ ...options, jobId: "first" });
+  await seedArtifacts(options.nextDir, { value: "new", pages: [""] });
+  let copies = 0, deletes = 0;
+  await assert.rejects(publishFiles({ ...options, jobId: "failed", remove: async () => { deletes++; }, copy: async (source, target) => {
     if (target.includes("/responses/") && ++copies === 2) throw new Error("injected disk error");
     await copyFile(source, target);
-  } }), (error) => /Upload failed.*injected disk error/.test(error.message) && error.publications.length === 0);
-  assert.deepEqual(await json(path.join(options.siteDir, "current.json")), prior.current);
-  assert.equal(await readFile(path.join(prior.releaseDir, "responses/sites/a/a1.html"), "utf8"), "<h1>old</h1>");
-  assert.deepEqual(await readdir(path.join(options.siteDir, "releases")), ["publish-first"]);
-  assert.deepEqual((await readdir(options.siteDir)).sort(), ["current.json", "releases"]);
-  await rm(path.join(options.nextDir, "server/app/sites/a/a1.segments/_tree.segment.rsc"));
-  await assert.rejects(publishFiles({ ...options, jobId: "publish-incomplete" }), /Missing segment/);
-  assert.deepEqual(await json(path.join(options.siteDir, "current.json")), prior.current);
+  } }), error => error.phase === "upload-responses" && error.partial && error.cause.message === "injected disk error"
+    && error.publications[0].uploaded === 1 && !error.publications[0].distributed);
+  assert.equal(deletes, 0);
+  assert.equal(await readFile(responsePath(options, "a1.html"), "utf8"), "<h1>new</h1>");
+  assert.equal(await readFile(responsePath(options, "a1.rsc"), "utf8"), "rsc:old");
+  await access(responsePath(options, "a1/menu.html"));
+  assert.ok(!(await readdir(path.dirname(responsePath(options, "a1.html")))).some(f => f.endsWith(".tmp")));
+  await publishFiles({ ...options, jobId: "retry-new-request" });
+  await assert.rejects(access(responsePath(options, "a1/menu.html")), { code: "ENOENT" });
 });
 
-test("a new manifest reflects deleted routes, retains previous release and does not alter another merchant", async (t) => {
+test("incomplete response collections reject before any upload", async t => {
+  for (const missing of ["a1.html", "a1.rsc", "a1.meta", "a1.segments/_tree.segment.rsc", "a1/robots.txt.body"]) {
+    const options = await fixture(t);
+    await rm(path.join(options.nextDir, "server/app/sites/a", missing));
+    let writes = 0;
+    await assert.rejects(publishFiles({ ...options, jobId: "incomplete", copy: async () => { writes++; }, write: async () => { writes++; } }));
+    assert.equal(writes, 0);
+  }
+});
+
+test("response difference removes deleted pages and stale segments only under the exact merchant prefix", async t => {
   const options = await fixture(t);
   await seedArtifacts(options.nextDir, { id: "a10" });
-  const first = await publishFiles({ ...options, sites: [site, { id: "a10", templateId: "a" }], jobId: "publish-first" });
-  const otherPointer = path.join(options.artifactDir, "runtimes", runtimeId, "sites/a/a10/current.json");
-  const otherBefore = await readFile(otherPointer, "utf8");
+  const other = { id: "a10", templateId: "a" };
+  await publishFiles({ ...options, sites: [site, other], jobId: "first" });
+  await publishFiles({ ...options, runtimeId: "runtime-other", jobId: "other-runtime" });
+  const otherPath = path.join(options.artifactDir, "runtimes", runtimeId, "sites/a/a10/responses/sites/a/a10.html");
   const staticBefore = await readdir(path.join(options.artifactDir, "_next/static/chunks"));
-  await seedArtifacts(options.nextDir, { value: "new", pages: [""] });
-  const second = (await publishFiles({ ...options, jobId: "publish-second" })).publications[0];
-  assert.deepEqual(second.previous, first.publications[0].current);
-  assert.deepEqual(second.current.previous, { publishId: "publish-first", jobId: "publish-first", contentRevision: "revision-one" });
-  assert.equal(second.manifest.contentRevision, "revision-one");
-  assert.equal(second.manifest.routes.some(({ path }) => path === "/menu"), false);
-  await assert.rejects(access(path.join(second.releaseDir, "responses/sites/a/a1/menu.html")), { code: "ENOENT" });
-  assert.equal(await readFile(path.join(first.publications[0].releaseDir, "responses/sites/a/a1/menu.html"), "utf8"), "<h1>old</h1>");
-  assert.equal(await readFile(otherPointer, "utf8"), otherBefore);
-  for (const file of staticBefore) await access(path.join(options.artifactDir, "_next/static/chunks", file));
+  await seedArtifacts(options.nextDir, { value: "new", pages: ["", "/renamed"] });
+  const meta = await json(path.join(options.nextDir, "server/app/sites/a/a1.meta"));
+  meta.segmentPaths = ["/_tree"];
+  await put(options.nextDir, "server/app/sites/a/a1.meta", JSON.stringify(meta));
+  const [p] = (await publishFiles({ ...options, jobId: "second" })).publications;
+  assert.ok(p.deleted > 0);
+  await assert.rejects(access(responsePath(options, "a1/menu.html")), { code: "ENOENT" });
+  await assert.rejects(access(responsePath(options, "a1.segments/_full.segment.rsc")), { code: "ENOENT" });
+  await access(responsePath(options, "a1/renamed.html"));
+  assert.equal(await readFile(otherPath, "utf8"), "<h1>old</h1>");
+  await access(path.join(options.artifactDir, "runtimes/runtime-other/sites/a/a1/responses/sites/a/a1/menu.html"));
+  for (const f of staticBefore) await access(path.join(options.artifactDir, "_next/static/chunks", f));
 });
 
-test("batch failure exposes already committed merchant results without a cross-merchant transaction", async (t) => {
+test("deletion failure reports covered objects as partial and preserves completed merchants", async t => {
+  const options = await fixture(t);
+  await seedArtifacts(options.nextDir, { id: "a10" });
+  await publishFiles({ ...options, jobId: "first" });
+  await seedArtifacts(options.nextDir, { value: "new", pages: [""] });
+  await assert.rejects(publishFiles({ ...options, sites: [{ id: "a10", templateId: "a" }, site], jobId: "batch",
+    remove: async () => { throw new Error("delete denied"); },
+  }), error => error.phase === "delete-responses" && error.objectPath.includes("/sites/a/a1/responses/")
+    && error.publications[0].distributed && !error.publications[1].distributed && error.publications[1].uploaded > 0);
+  assert.equal(await readFile(responsePath(options, "a1.html"), "utf8"), "<h1>new</h1>");
+});
+
+test("batch upload failure reports the failed merchant as well as completed merchants", async t => {
   const options = await fixture(t);
   await seedArtifacts(options.nextDir, { id: "a10" });
   await assert.rejects(publishFiles({ ...options, sites: [site, { id: "a10", templateId: "a" }], jobId: "batch", copy: async (source, target) => {
     if (source.endsWith("sites/a/a10.html")) throw new Error("second merchant disk error");
     await copyFile(source, target);
-  } }), (error) => error.publications.length === 1 && error.publications[0].siteId === "a1");
-  assert.equal((await json(path.join(options.siteDir, "current.json"))).publishId, "batch");
-  await assert.rejects(access(path.join(options.artifactDir, "runtimes", runtimeId, "sites/a/a10/current.json")), { code: "ENOENT" });
+  } }), error => error.publications.length === 2 && error.publications[0].distributed
+    && !error.publications[1].distributed && error.publications[1].siteId === "a10");
 });
 
-
-test("content revision and one previous publication persist independently of task history", async (t) => {
+test("same-byte and rapid complete overwrites update meta ETag including RSC/body-only changes", async t => {
   const options = await fixture(t);
-  await publishFiles({ ...options, jobId: "one" });
-  await seedArtifacts(options.nextDir, { value: "two" });
-  await publishFiles({ ...options, sites: [{ ...site, contentRevision: "revision-two" }], jobId: "two" });
-  await seedArtifacts(options.nextDir, { value: "three" });
-  const current = (await publishFiles({ ...options, sites: [{ ...site, contentRevision: "revision-three" }], jobId: "three" })).publications[0];
-  assert.equal(current.current.contentRevision, "revision-three");
-  assert.equal(current.manifest.contentRevision, "revision-three");
-  assert.deepEqual(current.current.previous, { publishId: "two", jobId: "two", contentRevision: "revision-two" });
-  assert.equal(Object.hasOwn(current.current.previous, "previous"), false);
+  await publishFiles({ ...options, jobId: "same" });
+  const base = await httpFixture(t, options), prefix = `/runtimes/${runtimeId}/sites/a/a1/responses/sites/a/a1`;
+  const tags = new Set();
+  for (let i = 0; i < 12; i++) {
+    await put(options.nextDir, "server/app/sites/a/a1.rsc", `rsc-${i}`);
+    await put(options.nextDir, "server/app/sites/a/a1/robots.txt.body", `robots-${i}`);
+    await publishFiles({ ...options, jobId: "same" });
+    const head = await fetch(base + prefix + ".meta", { method: "HEAD" });
+    const response = await fetch(base + prefix + ".meta");
+    assert.equal(response.headers.get("etag"), head.headers.get("etag"));
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.match(response.headers.get("access-control-expose-headers"), /ETag/);
+    const tag = response.headers.get("etag");
+    assert.ok(tag && !tags.has(tag)); tags.add(tag);
+    assert.equal((await response.json()).headers["X-Brand-Site-Publish-Id"], "same");
+    assert.equal(await (await fetch(base + prefix + ".rsc")).text(), `rsc-${i}`);
+    assert.equal(await (await fetch(base + prefix + "/robots.txt.body")).text(), `robots-${i}`);
+  }
+  const staticFile = (await readdir(path.join(options.artifactDir, "_next/static/chunks")))[0];
+  assert.match((await fetch(base + "/_next/static/chunks/" + staticFile)).headers.get("cache-control"), /immutable/);
+  assert.equal((await fetch(base + prefix + "/missing.meta")).status, 404);
+  assert.equal((await fetch(base + "/%2e%2e%2fpackage.json")).status, 400);
+});
+
+test("concurrent replacements keep each observed GET ETag bound to one body", async t => {
+  const options = await fixture(t);
+  await publishFiles({ ...options, jobId: "initial" });
+  const base = await httpFixture(t, options), url = `${base}/runtimes/${runtimeId}/sites/a/a1/responses/sites/a/a1.meta`;
+  const observations = new Map();
+  const read = async () => {
+    const response = await fetch(url), etag = response.headers.get("etag"), body = await response.text();
+    assert.equal(response.status, 200);
+    assert.equal(Number(response.headers.get("content-length")), Buffer.byteLength(body));
+    JSON.parse(body);
+    if (observations.has(etag)) assert.equal(body, observations.get(etag));
+    observations.set(etag, body);
+  };
+  await Promise.all([
+    (async () => { for (let i = 0; i < 12; i++) { await publishFiles({ ...options, jobId: `write-${i}` }); await read(); } })(),
+    ...Array.from({ length: 3 }, async () => { for (let i = 0; i < 24; i++) await read(); }),
+  ]);
+  assert.ok(observations.size > 1);
 });

@@ -1,4 +1,4 @@
-import { readdir, readFile, copyFile, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -22,14 +22,6 @@ function requireId(value, label) {
   if (typeof value !== "string" || !safeId.test(value)) throw new Error(`Invalid ${label}`);
 }
 
-/** A release reference is a publication fact, not a persistent task lookup. */
-export function publicationReference(pointer) {
-  if (!pointer) return null;
-  requireId(pointer.publishId, "previous publish ID");
-  requireId(pointer.jobId, "previous trace ID");
-  return { publishId: pointer.publishId, jobId: pointer.jobId, contentRevision: pointer.contentRevision ?? null };
-}
-
 async function collectSite({ site, appRoot, available, prerender, runtimeId, publishId }) {
   requireId(site.id, "publication site ID");
   requireId(site.templateId, "publication template ID");
@@ -46,7 +38,8 @@ async function collectSite({ site, appRoot, available, prerender, runtimeId, pub
     if (page === body) throw new Error(`Missing or ambiguous prerendered response: ${cacheKey}`);
     const metaPath = `${cacheKey}.meta`;
     const meta = JSON.parse(await readFile(path.join(appRoot, metaPath), "utf8"));
-    const files = [`${cacheKey}.${page ? "html" : "body"}`, metaPath];
+    if (!meta || typeof meta !== "object" || Array.isArray(meta)) throw new Error(`Invalid metadata: ${cacheKey}`);
+    const files = [`${cacheKey}.${page ? "html" : "body"}`];
     if (page) {
       if (!available.has(`${cacheKey}.rsc`)) throw new Error(`Missing RSC: ${cacheKey}`);
       files.push(`${cacheKey}.rsc`);
@@ -59,6 +52,7 @@ async function collectSite({ site, appRoot, available, prerender, runtimeId, pub
         files.push(file);
       }
     }
+    files.push(metaPath);
     const headers = Object.fromEntries(Object.entries(meta.headers || {}).filter(([key]) =>
       !["x-brand-site-runtime-id", "x-brand-site-publish-id"].includes(key.toLowerCase())));
     metadata.set(metaPath, { ...meta, headers: {
@@ -68,85 +62,78 @@ async function collectSite({ site, appRoot, available, prerender, runtimeId, pub
     routes.push({ path: suffix === "/sitemap-data" ? "/sitemap.xml" : suffix || "/",
       cacheKey, kind: page ? "APP_PAGE" : "APP_ROUTE", files });
   }
-  return { site, metadata, manifest: { runtimeId, templateId: site.templateId, siteId: site.id, publishId, contentRevision: site.contentRevision ?? null, routes } };
+  return { site, metadata, routes };
 }
 
-export async function publishFiles({ nextDir, artifactDir, sites, runtimeId, jobId, publishId = jobId, copy = copyFile }) {
+export async function publishFiles({ nextDir, artifactDir, sites, runtimeId, jobId, publishId = jobId,
+  copy = copyFile, write = writeFile, remove = rm }) {
   requireId(runtimeId, "runtime ID");
   requireId(jobId, "job ID");
   requireId(publishId, "publish ID");
   if (!Array.isArray(sites)) throw new Error("Publication targets must be an array");
   if (new Set(sites.map((site) => `${site.templateId}/${site.id}`)).size !== sites.length) throw new Error("Duplicate publication targets");
   const appRoot = path.join(nextDir, "server/app");
-  const [all, prerenderText] = await Promise.all([
-    filesAt(appRoot), readFile(path.join(nextDir, "prerender-manifest.json"), "utf8"),
+  const [all, prerenderText, staticFiles] = await Promise.all([
+    filesAt(appRoot), readFile(path.join(nextDir, "prerender-manifest.json"), "utf8"), filesAt(path.join(nextDir, "static")),
   ]);
   const prerender = JSON.parse(prerenderText);
   const available = new Set(all);
+  // Validate every selected merchant before the first remote write.
   const selected = await Promise.all(sites.map((site) => collectSite({ site, appRoot, available, prerender, runtimeId, publishId })));
   const publications = [];
-  const copyOne = async (source, target) => {
+  let phase = "upload-static", objectPath;
+  const replace = async (target, operation) => {
+    objectPath = path.relative(artifactDir, target).split(path.sep).join("/");
+    await mkdir(path.dirname(target), { recursive: true });
+    const temporary = `${target}.${randomUUID()}.tmp`;
     try {
-      await mkdir(path.dirname(target), { recursive: true });
-      await copy(source, target);
-    } catch (cause) { throw new Error(`Upload failed: ${target}: ${cause.message}`, { cause }); }
+      await operation(temporary);
+      // Only one object is replaced atomically; the publication is not atomic.
+      await rename(temporary, target);
+    } finally { await rm(temporary, { force: true }); }
   };
-
   try {
-    // Static URLs are immutable too; a failed copy must not truncate an old resource.
-    const staticRoot = path.join(nextDir, "static");
-    for (const file of await filesAt(staticRoot)) {
-      const source = path.join(staticRoot, file);
+    for (const file of staticFiles) {
+      const source = path.join(nextDir, "static", file);
       const target = path.join(artifactDir, "_next/static", file);
+      objectPath = `_next/static/${file}`;
       const existing = await optionalFile(target);
       if (existing) {
         if (!existing.equals(await readFile(source))) throw new Error(`Static URL has different content: ${file}`);
         continue;
       }
-      const temporary = `${target}.${randomUUID()}.tmp`;
-      try { await copyOne(source, temporary); await rename(temporary, target); }
-      finally { await rm(temporary, { force: true }); }
+      await replace(target, (temporary) => copy(source, temporary));
     }
-
-    for (const { site, metadata, manifest } of selected) {
-      const siteDir = path.join(artifactDir, "runtimes", runtimeId, "sites", site.templateId, site.id);
-      const releasesDir = path.join(siteDir, "releases");
-      const releaseDir = path.join(releasesDir, publishId);
-      const currentPath = path.join(siteDir, "current.json");
-      const previousBytes = await optionalFile(currentPath);
-      const previous = previousBytes ? JSON.parse(previousBytes) : null;
-      if (previous && (previous.runtimeId !== runtimeId || previous.templateId !== site.templateId || previous.siteId !== site.id)) {
-        throw new Error("Previous publication identity differs from the target site");
-      }
-      const current = { runtimeId, templateId: site.templateId, siteId: site.id, publishId, jobId,
-        contentRevision: manifest.contentRevision, previous: publicationReference(previous) };
-      await mkdir(releasesDir, { recursive: true });
-      const temporary = await mkdtemp(path.join(releasesDir, `.${publishId}-`));
-      const pointerTemporary = path.join(siteDir, `.current-${randomUUID()}.tmp`);
-      try {
-        for (const route of manifest.routes) {
-          for (const file of route.files) {
-            const target = path.join(temporary, "responses", file);
-            if (metadata.has(file)) {
-              await mkdir(path.dirname(target), { recursive: true });
-              await writeFile(target, JSON.stringify(metadata.get(file)));
-            } else await copyOne(path.join(appRoot, file), target);
-          }
+    for (const { site, metadata, routes } of selected) {
+      const objectPrefix = `runtimes/${runtimeId}/sites/${site.templateId}/${site.id}/responses/`;
+      const responseDir = path.join(artifactDir, objectPrefix);
+      const publication = { merchantId: site.id, siteId: site.id, templateId: site.templateId,
+        runtimeId, jobId, publishId, contentRevision: site.contentRevision ?? null,
+        objectPrefix, routes, uploaded: 0, deleted: 0, distributed: false };
+      publications.push(publication);
+      phase = "upload-responses";
+      for (const route of routes) {
+        for (const file of route.files) {
+          await replace(path.join(responseDir, file), (temporary) => metadata.has(file)
+            ? write(temporary, JSON.stringify(metadata.get(file))) : copy(path.join(appRoot, file), temporary));
+          publication.uploaded++;
         }
-        await writeFile(path.join(temporary, "manifest.json"), JSON.stringify(manifest));
-        // A completed release is nonempty, so rename cannot replace an existing release.
-        await rename(temporary, releaseDir);
-        await writeFile(pointerTemporary, JSON.stringify(current));
-        await rename(pointerTemporary, currentPath);
-        publications.push({ siteId: site.id, templateId: site.templateId, current, previous, manifest, releaseDir });
-      } finally {
-        await Promise.all([rm(temporary, { recursive: true, force: true }), rm(pointerTemporary, { force: true })]);
       }
+      phase = "delete-responses";
+      objectPath = objectPrefix;
+      const expected = new Set(routes.flatMap((route) => route.files));
+      for (const file of await filesAt(responseDir)) {
+        if (expected.has(file)) continue;
+        objectPath = objectPrefix + file;
+        await remove(path.join(responseDir, file));
+        publication.deleted++;
+      }
+      publication.distributed = true;
     }
-  } catch (error) {
-    error.publications = publications;
-    throw error;
+  } catch (cause) {
+    throw Object.assign(new Error(`Artifact ${phase} failed at ${objectPath}: ${cause.message}; remote objects may be partially updated; republish the complete merchant`, { cause }),
+      { status: "FAILED", phase, objectPath, partial: true, publications });
   }
   return { runtimeId, publishId, jobId, sites: publications.map(({ siteId }) => siteId),
-    responses: publications.reduce((count, { manifest }) => count + manifest.routes.length, 0), publications };
+    responses: publications.reduce((count, { routes }) => count + routes.length, 0), publications };
 }
