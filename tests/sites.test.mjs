@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { access, readFile, realpath, writeFile } from "node:fs/promises";
+import { access, readFile, realpath, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs, main } from "../scripts/sites.mjs";
 import { normalizeScope } from "../scripts/content-input.mjs";
@@ -8,7 +8,7 @@ import { installedTemplate } from "./helpers/installed-template.mjs";
 import { put, seedArtifacts } from "./helpers/artifacts.mjs";
 
 const runtimeId = "runtime-r2", jobId = "job-r2";
-const args = (mode, f) => [mode, "--input-dir", f.inputDir, "--runtime-id", runtimeId, "--job-id", jobId, "--result-file", path.join(f.root, "result.json")];
+const args = (mode, f) => [mode, "--work-root", f.root, "--input-dir", f.inputDir, "--runtime-id", runtimeId, "--job-id", jobId, "--result-file", path.join(f.root, "result.json")];
 
 async function deployed(f) {
   const appDir = path.join(f.root, "app");
@@ -19,7 +19,7 @@ async function deployed(f) {
 }
 
 test("CLI uses explicit job/source inputs and mutually exclusive structured scopes", async () => {
-  for (const [options, scope] of [[["--all"], { scope: "all" }], [["--template", "template-a"], { scope: "template", templateId: "template-a" }], [["--site=tenant-r2"], { scope: "site", siteId: "tenant-r2" }]]) assert.deepEqual(parseArgs(["publish", ...options]).scope, scope);
+  for (const [options, scope] of [[["--all"], { scope: "all" }], [["--template", "template-a"], { scope: "template", templateId: "template-a" }], [["--site=29742a52-d824-469b-a395-52084345b7ad"], { scope: "site", siteId: "29742a52-d824-469b-a395-52084345b7ad" }]]) assert.deepEqual(parseArgs(["publish", ...options]).scope, scope);
   for (const options of [["--all", "--site", "a3"], ["--template"], ["--site", "../a3"], ["--unknown"], ["--runtime-id", "../bad"]]) assert.throws(() => parseArgs(["publish", ...options]));
   assert.throws(() => normalizeScope({ scope: "all", siteId: "a3" }));
   await assert.rejects(main(["build"]), /runtime-id and --job-id are required/);
@@ -50,10 +50,13 @@ test("empty merchant build packages runtime and previews, and distributes static
   await access(path.join(artifactDir, "_next/static/chunks/preview-123.js"));
   await assert.rejects(access(path.join(artifactDir, "runtimes")), { code: "ENOENT" });
   assert.deepEqual(JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8")), result);
+  assert.ok(work.startsWith((await realpath(f.root)) + path.sep));
   await assert.rejects(access(work), { code: "ENOENT" });
+  await access(f.inputDir);
+  assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-site-")));
 });
 
-test("content publication fixes disk input once and emits real immutable writer results without fetching API", async (t) => {
+test("content publication fixes disk input once and emits fixed object writer results without fetching API", async (t) => {
   const f = await installedTemplate(t, { merchant: true });
   f.config.contentRevision = "saved-revision-one";
   await writeFile(path.join(f.inputDir, "sites.json"), JSON.stringify([f.config]));
@@ -71,25 +74,51 @@ test("content publication fixes disk input once and emits real immutable writer 
   } });
   assert.equal(builds, 1);
   assert.equal(result.status, "published");
-  assert.equal(result.publications[0].current.publishId, jobId);
-  assert.equal(result.publications[0].current.runtimeId, runtimeId);
-  assert.equal(result.publications[0].current.contentRevision, "saved-revision-one");
-  assert.equal(result.publications[0].manifest.contentRevision, "saved-revision-one");
+  assert.equal(result.publications[0].publishId, jobId);
+  assert.equal(result.publications[0].runtimeId, runtimeId);
+  assert.equal(result.publications[0].contentRevision, "saved-revision-one");
+  assert.equal(result.publications[0].distributed, true);
   assert.equal(result.publications[0].siteId, f.config.id);
+  assert.ok(work.startsWith((await realpath(f.root)) + path.sep));
   await assert.rejects(access(work), { code: "ENOENT" });
+  await access(f.inputDir);
+  assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-site-")));
 });
 
 test("publication failure writes completed merchant results and cleans its work without reporting success", async (t) => {
   const f = await installedTemplate(t, { merchant: true });
   const env = await deployed(f);
   let work;
-  const completed = [{ siteId: "previous-merchant", current: { publishId: jobId } }];
+  const completed = [{ siteId: "previous-merchant", publishId: jobId, distributed: true, uploaded: 4, deleted: 0 }];
   await assert.rejects(main(args("publish", f), { sourceRoot: f.sourceRoot, env,
     runner: async (_command, _args, cwd) => { work = cwd; },
-    publish: async () => { throw Object.assign(new Error("disk failure"), { publications: completed }); },
+    publish: async () => { throw Object.assign(new Error("disk failure"), { phase: "delete-responses", objectPath: "runtimes/target/old.meta", partial: true, publications: completed }); },
   }), /during upload.*disk failure/);
   const saved = JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8"));
   assert.match(saved.error, /disk failure/);
   assert.deepEqual(saved.publications, completed);
+  assert.equal(saved.phase, "delete-responses");
+  assert.equal(saved.objectPath, "runtimes/target/old.meta");
+  assert.equal(saved.partial, true);
+  assert.ok(work.startsWith((await realpath(f.root)) + path.sep));
   await assert.rejects(access(work), { code: "ENOENT" });
+  await access(f.inputDir);
+  assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-site-")));
+});
+
+test("missing work root or failed compilation cannot leave unowned execution staging", async t => {
+  const f = await installedTemplate(t, { merchant: true });
+  const env = await deployed(f);
+  await assert.rejects(main(args("publish", f).filter((_, index) => index !== 1 && index !== 2), { sourceRoot: f.sourceRoot, env }), /work-root is required/);
+  let work;
+  await assert.rejects(main(args("publish", f), { sourceRoot: f.sourceRoot, env,
+    runner: async (_command, _args, cwd) => { work = cwd; throw new Error("injected compile failure"); },
+  }), /during build.*compile failure/);
+  const result = JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8"));
+  assert.equal(result.phase, "build");
+  assert.equal(result.partial, false);
+  await assert.rejects(access(work), { code: "ENOENT" });
+  await access(f.inputDir);
+  await access(path.join(env.APP_DIR, "runtime.json"));
+  assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-site-")));
 });

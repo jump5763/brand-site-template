@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { access, readFile, rm, writeFile } from "node:fs/promises";
+import { access, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createSiteApi, SiteApiError } from "../src/server/site-api.mjs";
@@ -34,11 +34,13 @@ test("fixed Git installation registers selected modules and leaves preview shell
   assert.match(navigation, /publicPathname\(usePathname\(\)\)/);
   const original = await readFile(path.join(f.sourceRoot, "src/templates/template-a/site-schema/current.json"), "utf8");
   await writeFile(path.join(f.templateRoot, "src/site-schema/current.json"), "uncommitted broken content");
-  await installTemplates({ sourceRoot: f.sourceRoot, templateRepoDir: f.templateRepoDir, templateSources: f.templateSources });
+  await installTemplates({ sourceRoot: f.sourceRoot, templateRepoDir: f.templateRepoDir, templateSources: f.templateSources, temporaryRoot: f.root });
   assert.equal(await readFile(path.join(f.sourceRoot, "src/templates/template-a/site-schema/current.json"), "utf8"), original);
+  assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-template-import-")));
   const bad = structuredClone(f.templateSources); bad["template-a"].templateTreeHash = "0".repeat(40);
-  await assert.rejects(installTemplates({ ...f, templateSources: bad }), /tree identity mismatch/);
+  await assert.rejects(installTemplates({ ...f, templateSources: bad, temporaryRoot: f.root }), /tree identity mismatch/);
   assert.equal(await readFile(path.join(f.sourceRoot, "src/templates/template-a/site-schema/current.json"), "utf8"), original);
+  assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-template-import-")));
 });
 
 test("empty merchant input builds independent noindex previews and carries health plus runtime identity", async (t) => {
@@ -48,8 +50,9 @@ test("empty merchant input builds independent noindex previews and carries healt
   assert.equal(fixed.previews.length, 1);
   assert.equal(fixed.previews[0].document.siteId, f.defaults.siteId);
   assert.equal(fixed.previews[0].document.siteUrl, "http://template-a.preview.localhost:3400");
-  const work = await prepareWorkspace(f.sourceRoot, [], { ...fixed, completeTemplates: true, runtimeId: "runtime-r2", jobId: "job-r2" });
+  const work = await prepareWorkspace(f.sourceRoot, [], { ...fixed, temporaryRoot: f.root, completeTemplates: true, runtimeId: "runtime-r2", jobId: "job-r2" });
   t.after(() => rm(work, { recursive: true, force: true }));
+  assert.ok(work.startsWith((await realpath(f.root)) + path.sep));
   assert.deepEqual(getBuildSites(work), []);
   assert.equal((await readPreviewDocument("template-a", work)).siteId, f.defaults.siteId);
   await access(path.join(work, "src/app/healthz/route.ts"));

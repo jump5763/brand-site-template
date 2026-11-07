@@ -4,11 +4,14 @@ import path from "node:path";
 import { readLocalDocuments } from "./content-input.mjs";
 
 /** Only explicit source inputs cross into the temporary build root. */
-export async function prepareWorkspace(projectRoot, selected, { catalog = selected, documents, previews = [], completeTemplates = false, runtimeId, jobId } = {}) {
+export async function prepareWorkspace(projectRoot, selected, { catalog = selected, documents, previews = [], completeTemplates = false, runtimeId, jobId, temporaryRoot = os.tmpdir() } = {}) {
   if (!Array.isArray(selected) || (!selected.length && !previews.length)) throw new Error("No fixed build targets");
   documents ??= await readLocalDocuments(projectRoot, selected);
   assertDocumentSelection(selected, documents);
-  const work = await realpath(await mkdtemp(path.join(os.tmpdir(), "brand-site-")));
+  // Direct tooling keeps its self-cleaned OS default; Builder supplies its execution root.
+  if (!path.isAbsolute(temporaryRoot)) throw new Error("temporaryRoot must be absolute");
+  await mkdir(temporaryRoot, { recursive: true });
+  const work = await realpath(await mkdtemp(path.join(temporaryRoot, "brand-site-")));
   try {
     const registered = JSON.parse(await readFile(path.join(projectRoot, "src/template-ids.json"), "utf8"));
     const templates = completeTemplates ? registered : [...new Set([...catalog.map((site) => site.templateId), ...previews.map((preview) => preview.templateId)])];
@@ -17,12 +20,14 @@ export async function prepareWorkspace(projectRoot, selected, { catalog = select
       await mkdir(path.dirname(target), { recursive: true });
       await cp(path.join(projectRoot, relative), target, { recursive: true });
     };
-    await Promise.all([
+    const copied = await Promise.allSettled([
       ...["package.json", "pnpm-lock.yaml", ".npmrc", "tsconfig.json", "next.config.ts", "cache-handler.cjs", "postcss.config.mjs", "tailwind.config.cjs",
         "src/app/(index)", "src/app/healthz", "src/styles", "src/shared", "src/server", "src/load-site.ts", "src/site-routing.mjs", "src/template-ids.json", "src/proxy.ts"].map(copy),
       ...templates.flatMap((template) => [`src/templates/${template}`, `src/app/sites/${template}`]).map(copy),
       ...previews.map(({ templateId }) => copy(`src/app/preview/${templateId}`)),
     ]);
+    const failedCopy = copied.find(result => result.status === "rejected");
+    if (failedCopy) throw failedCopy.reason;
     await mkdir(path.join(work, "public"), { recursive: true });
     // Missing media directories are normal; never copy another merchant's assets.
     for (const relative of ["public/shared", ...templates.map((id) => `public/templates/${id}`), ...selected.map((site) => `public/media/${site.id}`)]) {

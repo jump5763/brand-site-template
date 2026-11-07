@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { assertSafeBuildOutput, assertSafeAuditOutput } from "../scripts/output-paths.mjs";
+import { assertSafeBuildOutput, assertSafeAuditOutput, assertExecutionPath } from "../scripts/output-paths.mjs";
 import { put } from "./helpers/artifacts.mjs";
 
 async function fixture(t) {
@@ -116,4 +116,14 @@ test("audit outputs reject external paths and application/artifact overlaps incl
   }
   await assert.rejects(assertSafeAuditOutput({ projectRoot, output: "output/artifacts" }), /protected directory/);
   await assert.rejects(assertSafeAuditOutput({ projectRoot, output: "output/artifacts/new" }), /protected directory/);
+});
+
+test("execution handoffs stay inside the supplied work root including symlink aliases", async t => {
+  const { root, projectRoot } = await fixture(t);
+  const workRoot = path.join(projectRoot, "work");
+  await mkdir(workRoot);
+  assert.equal(await assertExecutionPath({ workRoot, file: path.join(workRoot, "input/sites.json"), label: "input" }), path.join(workRoot, "input/sites.json"));
+  await symlink(root, path.join(workRoot, "escape"), "dir");
+  for (const file of [workRoot, path.join(root, "executions/result.json"), path.join(workRoot, "escape/result.json")])
+    await assert.rejects(assertExecutionPath({ workRoot, file, label: "result" }), /must be inside/);
 });

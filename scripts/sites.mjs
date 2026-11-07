@@ -8,7 +8,7 @@ import templateIds from "../src/template-ids.json" with { type: "json" };
 import { prepareWorkspace } from "./prepare.mjs";
 import { readApiCatalog, readBuildCatalog, readFixedInput, normalizeScope, scopeLabel, selectCatalogScope } from "./content-input.mjs";
 import { readDeployedBaseline, validateDeployedCapabilities } from "./deployed-scope.mjs";
-import { assertSafeAuditOutput, assertSafeBuildOutput } from "./output-paths.mjs";
+import { assertSafeAuditOutput, assertSafeBuildOutput, assertExecutionPath } from "./output-paths.mjs";
 import { publishFiles } from "./publish-files.mjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -35,7 +35,7 @@ export function parseArgs(args) {
   if (!["build", "dev", "start", "publish", "upload", "typecheck", "validate", "schema:generate", "schema:check"].includes(mode)) throw new Error("Unknown command");
   let scope = { scope: "all" }, explicit = false;
   const values = {}, extra = [];
-  const names = { "--input-dir": "inputDir", "--runtime-id": "runtimeId", "--job-id": "jobId", "--result-file": "resultFile", "--output": "output" };
+  const names = { "--input-dir": "inputDir", "--work-root": "workRoot", "--runtime-id": "runtimeId", "--job-id": "jobId", "--result-file": "resultFile", "--output": "output" };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === "--") continue;
@@ -52,7 +52,7 @@ export function parseArgs(args) {
       if (values[name]) throw new Error(`Choose one ${flag}`);
       const value = arg.includes("=") ? arg.slice(flag.length + 1) : args[++index];
       if (!value || value.startsWith("--")) throw new Error(`${flag} requires a value`);
-      values[name] = ["inputDir", "resultFile", "output"].includes(name) ? path.resolve(value) : value;
+      values[name] = ["inputDir", "resultFile", "output", "workRoot"].includes(name) ? path.resolve(value) : value;
     } else {
       if (!["dev", "start"].includes(mode)) throw new Error(`Unknown argument: ${arg}`);
       extra.push(arg);
@@ -113,6 +113,8 @@ async function executeFixed(options, dependencies = {}) {
   if (["build", "publish"].includes(mode) && (!safeId.test(runtimeId || "") || !safeId.test(jobId || ""))) throw new Error("--runtime-id and --job-id are required");
   const input = await readFixedInput({ sourceRoot, inputDir, scope });
   if (mode === "validate") return { status: "valid", sites: input.selected.map((site) => site.id) };
+  if (["build", "publish"].includes(mode) && !options.workRoot) throw new Error("--work-root is required for an execution");
+  if (options.workRoot) await assertExecutionPath({ workRoot: options.workRoot, file: inputDir, label: "--input-dir" });
   let buildEnv = {}, output, work, result, failure;
   let stage = "input validation";
   try {
@@ -127,7 +129,7 @@ async function executeFixed(options, dependencies = {}) {
     }
     if (mode === "build") output = await assertSafeBuildOutput({ projectRoot: sourceRoot, output: options.output, artifactDir: env.ARTIFACT_DIR, appDir: env.APP_DIR });
     stage = "prepare";
-    work = await prepare(sourceRoot, input.selected, { documents: input.documents, previews: input.previews, completeTemplates: true, runtimeId, jobId });
+    work = await prepare(sourceRoot, input.selected, { documents: input.documents, previews: input.previews, completeTemplates: true, runtimeId, jobId, temporaryRoot: options.workRoot });
     stage = "build";
     await compileWorkspace(work, buildEnvironment(env, buildEnv), runner, mode);
     if (mode === "typecheck") return { status: "valid", sites: input.selected.map((site) => site.id) };
@@ -142,18 +144,21 @@ async function executeFixed(options, dependencies = {}) {
     if (auditRoot) {
       stage = "audit";
       const audit = await assertSafeAuditOutput({ projectRoot: sourceRoot, output: path.resolve(auditRoot, scopeLabel(scope)), artifactDir: env.ARTIFACT_DIR, appDir: env.APP_DIR });
+      if (options.workRoot) await assertExecutionPath({ workRoot: options.workRoot, file: audit, label: "Audit output" });
       await saveAudit(work, audit);
     }
   } catch (cause) {
     failure = new Error(`${mode} ${scopeLabel(scope)} failed during ${stage}: ${cause.message}`, { cause });
-    failure.publications = cause.publications || result?.publications || [];
+    Object.assign(failure, { phase: cause.phase || stage, objectPath: cause.objectPath, partial: cause.partial ?? Boolean(result?.publications?.length), code: cause.code || cause.cause?.code, publications: cause.publications || result?.publications || [] });
   } finally {
     if (work) {
       try { await cleanup(work, { recursive: true, force: true }); }
       catch (cause) {
         const publications = failure?.publications || result?.publications || [];
-        failure = new Error(`${failure ? failure.message + "; " : ""}${mode} failed during cleanup: ${cause.message}`, { cause });
-        failure.publications = publications;
+        const prior = failure;
+        failure = new Error(`${prior ? prior.message + "; " : ""}${mode} failed during cleanup: ${cause.message}`, { cause });
+        Object.assign(failure, { phase: prior?.phase || "cleanup", objectPath: prior?.objectPath || work,
+          partial: prior?.partial ?? Boolean(result?.publications?.length), code: prior?.code || cause.code, publications });
       }
     }
   }
@@ -163,7 +168,7 @@ async function executeFixed(options, dependencies = {}) {
 
 export async function publishScope(scope, dependencies = {}) {
   return executeFixed({ mode: "publish", scope: normalizeScope(scope), inputDir: dependencies.inputDir,
-    runtimeId: dependencies.runtimeId, jobId: dependencies.jobId }, dependencies);
+    runtimeId: dependencies.runtimeId, jobId: dependencies.jobId, workRoot: dependencies.workRoot }, dependencies);
 }
 
 async function tooling(options, dependencies) {
@@ -200,6 +205,7 @@ async function tooling(options, dependencies) {
 
 export async function main(args = process.argv.slice(2), dependencies = {}) {
   const options = parseArgs(args);
+  if (options.workRoot && options.resultFile) options.resultFile = await assertExecutionPath({ workRoot: options.workRoot, file: options.resultFile, label: "--result-file" });
   try {
     const result = ["build", "publish", "validate", "typecheck"].includes(options.mode) ? await executeFixed(options, dependencies) : await tooling(options, dependencies);
     if (options.resultFile) { await mkdir(path.dirname(options.resultFile), { recursive: true }); await writeFile(options.resultFile, JSON.stringify(result)); }
@@ -207,7 +213,7 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
   } catch (error) {
     if (options.resultFile) {
       await mkdir(path.dirname(options.resultFile), { recursive: true });
-      await writeFile(options.resultFile, JSON.stringify({ runtimeId: options.runtimeId, jobId: options.jobId, error: error.message, publications: error.publications || [] }));
+      await writeFile(options.resultFile, JSON.stringify({ runtimeId: options.runtimeId, jobId: options.jobId, error: error.message, phase: error.phase, objectPath: error.objectPath, partial: error.partial, code: error.code, publications: error.publications || [] }));
     }
     throw error;
   }

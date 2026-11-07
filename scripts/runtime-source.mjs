@@ -66,7 +66,7 @@ export function planContentSource({ deployedRuntime }) {
 }
 
 /** Create a fresh writable host source; template assembly belongs to the installer. */
-export async function prepareSourceSnapshot({ plan, sourceRoot }) {
+export async function prepareSourceSnapshot({ plan, sourceRoot, temporaryRoot = os.tmpdir() }) {
   const destination = path.resolve(sourceRoot);
   if (plan.source.kind === "snapshot") {
     const relative = path.relative(plan.source.sourceRoot, destination);
@@ -80,7 +80,10 @@ export async function prepareSourceSnapshot({ plan, sourceRoot }) {
   try {
     if (plan.source.kind === "git") {
       requireHash(plan.source.commit, "Source commit");
-      archiveDir = await mkdtemp(path.join(os.tmpdir(), "brand-site-source-"));
+      // Direct tooling keeps its self-cleaned OS default; Builder supplies its execution root.
+      if (!path.isAbsolute(temporaryRoot)) throw new Error("temporaryRoot must be absolute");
+      await mkdir(temporaryRoot, { recursive: true });
+      archiveDir = await mkdtemp(path.join(temporaryRoot, "brand-site-source-"));
       const archive = path.join(archiveDir, "source.tar");
       await execFileAsync("git", ["archive", "--format=tar", `--output=${archive}`, plan.source.commit], { cwd: plan.source.repositoryDir });
       await execFileAsync("tar", ["-xf", archive, "-C", destination]);

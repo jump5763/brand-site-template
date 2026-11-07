@@ -60,11 +60,14 @@ async function checkContract(templateRoot, sourceRoot, id) {
 }
 
 /** Rebuild only a writable candidate's template modules from explicit immutable Git trees. */
-export async function installTemplates({ sourceRoot, templateRepoDir, templateSources }) {
+export async function installTemplates({ sourceRoot, templateRepoDir, templateSources, temporaryRoot = os.tmpdir() }) {
   if (!path.isAbsolute(sourceRoot) || !path.isAbsolute(templateRepoDir)) throw new Error("Absolute sourceRoot and templateRepoDir are required");
   const ids = Object.keys(templateSources).sort();
   if (!ids.length || ids.some((id) => !safeId.test(id))) throw new Error("At least one fixed template source is required");
-  const staging = await mkdtemp(path.join(os.tmpdir(), "brand-template-import-"));
+  // Direct tooling keeps its self-cleaned OS default; Builder supplies its execution root.
+  if (!path.isAbsolute(temporaryRoot)) throw new Error("temporaryRoot must be absolute");
+  await mkdir(temporaryRoot, { recursive: true });
+  const staging = await mkdtemp(path.join(temporaryRoot, "brand-template-import-"));
   try {
     for (const id of ids) {
       const source = templateSources[id];

@@ -30,14 +30,14 @@ export async function installedTemplate(t, { merchant = false } = {}) {
   await Promise.all(["src", "package.json", "pnpm-lock.yaml", ".npmrc", "tsconfig.json", "next.config.ts", "cache-handler.cjs", "postcss.config.mjs", "tailwind.config.cjs"].map((file) => cp(path.join(hostRoot, file), path.join(sourceRoot, file), { recursive: true })));
   // Validation fixtures can share installed tools; real release sources install their own lockfile.
   await symlink(path.join(hostRoot, "node_modules"), path.join(sourceRoot, "node_modules"), "dir");
-  await installTemplates({ sourceRoot, templateRepoDir, templateSources });
+  await installTemplates({ sourceRoot, templateRepoDir, templateSources, temporaryRoot: root });
   const inputDir = path.join(root, "input");
   await preparePreviewInputs({ sourceRoot, inputDir });
   const defaults = JSON.parse(await readFile(path.join(sourceRoot, "src/templates/template-a/site-schema/current.json"), "utf8"));
-  const identity = { siteId: "tenant-r2", templateId: "template-a", siteUrl: "http://merchant-r2.localhost:3400" };
+  const identity = { siteId: "29742a52-d824-469b-a395-52084345b7ad", templateId: "template-a", siteUrl: "http://merchant-r2.localhost:3400" };
   const document = instantiateSiteDefaults(defaults, identity);
-  const config = { id: identity.siteId, templateId: identity.templateId, siteUrl: identity.siteUrl, hostname: "merchant-r2.localhost", contentFile: "sites/tenant-r2/current.json" };
-  await mkdir(path.join(inputDir, "sites/tenant-r2"), { recursive: true });
+  const config = { id: identity.siteId, templateId: identity.templateId, siteUrl: identity.siteUrl, hostname: "merchant-r2.localhost", contentFile: `sites/${identity.siteId}/current.json` };
+  await mkdir(path.join(inputDir, "sites", identity.siteId), { recursive: true });
   await writeFile(path.join(inputDir, config.contentFile), JSON.stringify(document));
   await writeFile(path.join(inputDir, "sites.json"), JSON.stringify(merchant ? [config] : []));
   return { root, sourceRoot, templateRepoDir, templateRoot, templateSources, inputDir, defaults, document, config, git };

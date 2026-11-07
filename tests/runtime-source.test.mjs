@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -42,7 +42,9 @@ test("first runtime fixes HEAD before exporting and excludes dirty or later host
   await writeFile(path.join(repo, "host.txt"), "second host");
   await git("commit", "--quiet", "-am", "Next host");
   await writeFile(path.join(repo, "host.txt"), "dirty host");
-  const result = await prepareSourceSnapshot({ plan, sourceRoot: path.join(root, "work", "source") });
+  const temporaryRoot = path.join(root, "work");
+  const result = await prepareSourceSnapshot({ plan, sourceRoot: path.join(temporaryRoot, "source"), temporaryRoot });
+  assert.deepEqual(await readdir(temporaryRoot), ["source"]);
   assert.equal(result.sourceRoot, path.join(root, "work", "source"));
   assert.equal(await readFile(path.join(result.sourceRoot, "host.txt"), "utf8"), "first host");
   assert.equal(await readFile(path.join(result.sourceRoot, ".host-config"), "utf8"), "fixed hidden file");
@@ -103,4 +105,13 @@ test("content plans copy confirmed source and lockfile without consulting a new 
   assert.equal(await readFile(path.join(deployed.sourceRoot, "host.txt"), "utf8"), "first host");
   assert.throws(() => planContentSource({ deployedRuntime: null }), /confirmed runtime/);
   await assert.rejects(prepareSourceSnapshot({ plan, sourceRoot: deployed.sourceRoot }), /outside/);
+});
+
+test("failed Git export removes both its source and caller-owned archive staging", async t => {
+  const { root, repo } = await repository(t);
+  const temporaryRoot = path.join(root, "work");
+  const plan = { source: { kind: "git", repositoryDir: repo, commit: "0".repeat(40) } };
+  await assert.rejects(prepareSourceSnapshot({ plan, sourceRoot: path.join(temporaryRoot, "source"), temporaryRoot }));
+  assert.deepEqual(await readdir(temporaryRoot), []);
+  await access(path.join(repo, "pnpm-lock.yaml"));
 });

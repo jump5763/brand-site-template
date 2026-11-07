@@ -93,3 +93,11 @@ export async function assertSafeAuditOutput({ projectRoot, output, artifactDir, 
   }
   return resolvedOutput;
 }
+
+/** Execution inputs and handoff files stay beneath the caller-owned workspace. */
+export async function assertExecutionPath({ workRoot, file, label }) {
+  if (typeof workRoot !== "string" || !path.isAbsolute(workRoot)) throw new Error("--work-root must be an absolute path");
+  const [root, target] = await Promise.all([resolvePath(workRoot), resolvePath(file)]);
+  if (root === target || !contains(root, target)) throw new Error(`${label} must be inside --work-root`);
+  return target;
+}
