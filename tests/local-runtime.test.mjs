@@ -73,26 +73,22 @@ test("runtime starts in a complete writable copy on loopback using the parent's 
   await access(path.join(candidate.appDir, "runtime.json"));
 });
 
-test("switch changes the actual process and restores the previous package after startup or verification failure", async (t) => {
+test("switch stops failures without automatically restarting the previous package", async (t) => {
   const { controller, app } = await fixture(t);
   const first = await controller.start(await app("runtime-one"));
-  let verified;
-  const second = await controller.switchTo(await app("runtime-two"), { verify: async (handle) => { verified = handle.runtimeId; } });
-  assert.equal(verified, "runtime-two");
+  const second = await controller.switchTo(await app("runtime-two"));
   assert.notEqual(second.pid, first.pid);
   await assert.rejects(access(first.runDir), { code: "ENOENT" });
   const broken = await app("runtime-broken", { code: "process.exit(7);" });
-  await assert.rejects(controller.switchTo(broken), (error) => /exited before becoming healthy/.test(error.message) && error.restoredRuntime.runtimeId === "runtime-two");
-  const afterStartupFailure = controller.getCurrent();
-  assert.equal(afterStartupFailure.runtimeId, "runtime-two");
-  assert.notEqual(afterStartupFailure.pid, second.pid);
-  const third = await app("runtime-three");
+  await assert.rejects(controller.switchTo(broken), (error) => /exited before becoming healthy/.test(error.message) && error.stopped === true && error.processState === "stopped" && !Object.hasOwn(error, "restoredRuntime"));
+  assert.equal(controller.getCurrent(), null);
   let failedRun;
-  await assert.rejects(controller.switchTo(third, { verify: async (handle) => { failedRun = handle.runDir; throw new Error("preview verification failed"); } }),
-    (error) => error.message === "preview verification failed" && error.restoredRuntime.runtimeId === "runtime-two");
-  assert.equal(controller.getCurrent().runtimeId, "runtime-two");
-  assert.notEqual(controller.getCurrent().pid, afterStartupFailure.pid);
+  await assert.rejects(controller.switchTo(await app("runtime-three"), { verify: async (handle) => {
+    failedRun = handle.runDir; throw new Error("preview verification failed");
+  } }), /preview verification failed/);
+  assert.equal(controller.getCurrent(), null);
   await assert.rejects(access(failedRun), { code: "ENOENT" });
+  assert.equal((await controller.start(await app("runtime-forward"))).runtimeId, "runtime-forward");
 });
 
 test("a first invalid package leaves no runtime and never passes identity verification", async (t) => {
@@ -105,15 +101,38 @@ test("a first invalid package leaves no runtime and never passes identity verifi
   assert.equal(running.runtimeId, "runtime-valid");
 });
 
-test("failure to restart the previous package is explicitly unconfirmed", async (t) => {
+test("unconfirmed exit protects the current process and rejects another candidate", async (t) => {
   const { controller, app } = await fixture(t);
-  const previous = await app("runtime-previous");
-  await controller.start(previous);
-  await writeFile(path.join(previous.appDir, "server.js"), "process.exit(8);");
-  const candidate = await app("runtime-candidate", { code: "process.exit(7);" });
-  await assert.rejects(controller.switchTo(candidate), (error) => error instanceof AggregateError && error.errors.length === 2 &&
-    error.code === "STATE_UNCONFIRMED" && error.awaitingConfirmation === true);
-  assert.equal(controller.getCurrent(), null);
+  const running = await controller.start(await app("runtime-stuck"));
+  const kill = running.child.kill.bind(running.child);
+  running.child.kill = () => false;
+  try {
+    await assert.rejects(controller.switchTo(await app("runtime-candidate")), error =>
+      error.code === "STATE_UNCONFIRMED" && error.stopped === false && error.processState === "unknown" && error.errors[0].processState === "unknown" && error.errors[0].pid === running.pid);
+    assert.equal(controller.getCurrent(), running);
+    await access(running.runDir);
+  } finally { running.child.kill = kill; }
+  await controller.stop();
+});
+
+test("unknown occupied port refuses launch and concurrent operations cannot spawn peers", async (t) => {
+  const { controller, app, port, root } = await fixture(t);
+  const outsider = http.createServer((req, res) => res.end("outsider"));
+  await new Promise(resolve => outsider.listen(port, "127.0.0.1", resolve));
+  try {
+    await assert.rejects(controller.start(await app("runtime-port")), {code:"RUNTIME_PORT_UNAVAILABLE"});
+    await assert.rejects(access(path.join(root,"run")), {code:"ENOENT"});
+    assert.equal(await (await fetch(`http://127.0.0.1:${port}`)).text(), "outsider");
+  } finally { await new Promise(resolve => outsider.close(resolve)); }
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const candidate = await app("runtime-once");
+  const starting = controller.start(candidate, {verify:async () => {entered(); await gate;}});
+  await ready;
+  try { await assert.rejects(controller.start(candidate), /already in progress/); }
+  finally {release();}
+  await starting;
 });
 
 test("a confirmed process exit remains successful when its temporary copy cannot be removed", async (t) => {
