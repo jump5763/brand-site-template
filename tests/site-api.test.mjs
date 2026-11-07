@@ -119,3 +119,33 @@ test("trusted response identity is checked before missing document identity is f
     await assert.rejects(api.readPublicDocument(merchantId), { code: "IDENTITY_MISMATCH" });
   }
 });
+
+test("draft API verifies merchant and template before parsing and preserves canonical content", async () => {
+  const merchantId = "29742a52-d824-469b-a395-52084345b7ad";
+  const siteUrl = "https://merchant.example.com";
+  let value = { merchantId, templateId: "a", siteUrl, contentRevision: "saved-b6",
+    site: JSON.stringify({ siteUrl, pages: [{ path: "/", metadata: { robots: { index: true } } }] }) };
+  const calls = [];
+  const api = createSiteApi({ baseUrl: "https://fixture.invalid", requestJson: async url => { calls.push(url.pathname); return value; } });
+  const before = JSON.stringify(value);
+  const result = await api.readDraftDocument(merchantId, "a");
+  assert.equal(result.document.siteId, merchantId);
+  assert.equal(result.contentRevision, "saved-b6");
+  assert.equal(result.document.siteUrl, siteUrl);
+  assert.equal(result.document.pages[0].metadata.robots.index, true);
+  assert.equal(JSON.stringify(value), before);
+  assert.deepEqual(calls, [`/brand-site/${merchantId}/drafts/a`]);
+  value = { ...value, merchantId: "a1111111-1111-4111-8111-111111111111", site: "invalid JSON" };
+  await assert.rejects(api.readDraftDocument(merchantId, "a"), { code: "IDENTITY_MISMATCH" });
+  value = { ...value, merchantId, templateId: "b" };
+  await assert.rejects(api.readDraftDocument(merchantId, "a"), { code: "IDENTITY_MISMATCH" });
+  value.templateId = "a";
+  for (const site of ["{", "null", "[]", "1", {}, null]) {
+    value.site = site;
+    await assert.rejects(api.readDraftDocument(merchantId, "a"), { code: "INVALID_RESPONSE" });
+  }
+  for (const document of [{ siteId: null, siteUrl }, { siteId: "", siteUrl }, { siteUrl: "https://wrong.example.com" }]) {
+    value.site = JSON.stringify(document);
+    await assert.rejects(api.readDraftDocument(merchantId, "a"), { code: "IDENTITY_MISMATCH" });
+  }
+});

@@ -16,7 +16,11 @@ export class SiteApiError extends Error {
   status?: number;
   constructor(code: SiteApiError["code"], message: string, status?: number);
 }
+export interface DraftDocument extends PublicDocument {
+  contentRevision: string;
+}
 export interface SiteApi {
+  readDraftDocument(merchantId: string, templateId: string): Promise<DraftDocument>;
   resolveMerchant(hostname: string): Promise<MerchantIdentity | null>;
   readPublicDocument(siteId: string, expected?: { templateId?: string; siteUrl?: string }): Promise<PublicDocument>;
   listPublicSites(scope?: PublicationScope): Promise<MerchantIdentity[]>;
@@ -30,3 +34,5 @@ export function createSiteApi(options?: {
 export const resolveMerchant: SiteApi["resolveMerchant"];
 export const readPublicDocument: SiteApi["readPublicDocument"];
 export const listPublicSites: SiteApi["listPublicSites"];
+
+export const readDraftDocument: SiteApi["readDraftDocument"];

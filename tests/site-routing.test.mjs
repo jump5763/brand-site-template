@@ -62,3 +62,14 @@ test("bare host has no installed templates", async () => {
   assert.equal(host.resolveSiteRequest(identity("a1"), "/"), null);
   assert.equal(host.resolvePreviewRequest("a.preview.localhost", "/"), null);
 });
+
+
+test("candidate preview Hosts carry merchant identity without a second route tree", () => {
+  for (const merchantId of ["29742a52-d824-469b-a395-52084345b7ad", "a1111111-1111-4111-8111-111111111111"]) {
+    assert.deepEqual(resolvePreviewRequest(`${merchantId}.a.preview.localhost:3400`, "/new-page"),
+      { merchantId, templateId: "a", pathname: "/preview/a/new-page" });
+    assert.equal(resolvePreviewRequest(`${merchantId}.a.preview.localhost`, "/preview/b/new-page"), null);
+  }
+  for (const host of ["invalid.a.preview.localhost", "extra.29742a52-d824-469b-a395-52084345b7ad.a.preview.localhost"])
+    assert.equal(resolvePreviewRequest(host, "/"), null);
+});

@@ -13,9 +13,9 @@ test("Proxy resolves the Host, isolates internal routes and distinguishes absenc
   const fixture = await sourceFixture(t);
   const directory = await mkdtemp(path.join(os.tmpdir(), "brand-proxy-test-"));
   const dataDir = path.join(directory, "data");
-  await initializeContent(dataDir, { siteIds: ["a1", "b1"] });
+  await initializeContent(dataDir, { siteIds: ["a1111111-1111-4111-8111-111111111111", "b1111111-1111-4111-8111-111111111111"] });
   const catalog = JSON.parse(await readFile(path.join(dataDir, "catalog.json"), "utf8"));
-  catalog.sites.push({ siteId: "c1", templateId: "uninstalled", siteUrl: "http://c1.localhost:3400", public: true });
+  catalog.sites.push({ merchantId: "c1111111-1111-4111-8111-111111111111", templateId: "uninstalled", siteUrl: "http://c1111111-1111-4111-8111-111111111111.localhost:3400", public: true });
   await writeFile(path.join(dataDir, "catalog.json"), JSON.stringify(catalog));
   let failure = false;
   const requests = [];
@@ -49,25 +49,25 @@ test("Proxy resolves the Host, isolates internal routes and distinguishes absenc
     assert.equal(response.headers.get("cache-control"), "no-store");
     return response;
   };
-  const normalizedRequest = new NextRequest("http://127.0.0.1:3400/menu?category=seasonal", { headers: { host: "a1.localhost:3400" } });
+  const normalizedRequest = new NextRequest("http://127.0.0.1:3400/menu?category=seasonal", { headers: { host: "a1111111-1111-4111-8111-111111111111.localhost:3400" } });
   // The runtime gate must align the listening origin with this locked Next normalization.
   assert.equal(normalizedRequest.nextUrl.host, "localhost:3400");
   const normalizedResponse = await proxy(normalizedRequest);
   const normalizedRewrite = new URL(normalizedResponse.headers.get("x-middleware-rewrite"));
-  assert.equal(normalizedRewrite.pathname, "/sites/a/a1/menu");
+  assert.equal(normalizedRewrite.pathname, "/sites/a/a1111111-1111-4111-8111-111111111111/menu");
   assert.equal(normalizedRewrite.search, "?category=seasonal");
-  const menu = await check("A1.LOCALHOST:3400", "/menu", 200, { "x-forwarded-host": "b1.localhost" });
-  assert.equal(new URL(menu.headers.get("x-middleware-rewrite")).pathname, "/sites/a/a1/menu");
-  const sitemap = await check("a1.localhost", "/sitemap.xml", 200);
-  assert.equal(new URL(sitemap.headers.get("x-middleware-rewrite")).pathname, "/sites/a/a1/sitemap-data");
-  const internal = await check("a1.localhost", "/sites/a/a1/menu", 200);
+  const menu = await check("A1111111-1111-4111-8111-111111111111.LOCALHOST:3400", "/menu", 200, { "x-forwarded-host": "b1111111-1111-4111-8111-111111111111.localhost" });
+  assert.equal(new URL(menu.headers.get("x-middleware-rewrite")).pathname, "/sites/a/a1111111-1111-4111-8111-111111111111/menu");
+  const sitemap = await check("a1111111-1111-4111-8111-111111111111.localhost", "/sitemap.xml", 200);
+  assert.equal(new URL(sitemap.headers.get("x-middleware-rewrite")).pathname, "/sites/a/a1111111-1111-4111-8111-111111111111/sitemap-data");
+  const internal = await check("a1111111-1111-4111-8111-111111111111.localhost", "/sites/a/a1111111-1111-4111-8111-111111111111/menu", 200);
   assert.equal(internal.headers.get("x-middleware-next"), "1");
-  for (const pathname of ["/sites/a/a3/menu", "/sites/b/b1/menu", "/sites/a/a1-other", "/sites"]) {
-    await check("a1.localhost", pathname, 404);
+  for (const pathname of ["/sites/a/a3333333-3333-4333-8333-333333333333/menu", "/sites/b/b1111111-1111-4111-8111-111111111111/menu", "/sites/a/a1111111-1111-4111-8111-111111111111-other", "/sites"]) {
+    await check("a1111111-1111-4111-8111-111111111111.localhost", pathname, 404);
   }
   await check("unknown.localhost", "/", 404);
   const beforeInvalid = requests.length;
-  await check("a1.localhost,evil", "/", 404);
+  await check("a1111111-1111-4111-8111-111111111111.localhost,evil", "/", 404);
   assert.equal(requests.length, beforeInvalid);
   for (const host of ["localhost:3400", "127.0.0.1:3400", "[::1]:3400"]) {
     const demo = await check(host, "/", 200);
@@ -78,14 +78,18 @@ test("Proxy resolves the Host, isolates internal routes and distinguishes absenc
   assert.equal(new URL(preview.headers.get("x-middleware-rewrite")).pathname, "/preview/a/menu");
   await check("missing.preview.localhost:3400", "/", 404);
   await check("a.preview.localhost:3400", "/preview/b/menu", 404);
+  const merchantPreview = await check("a1111111-1111-4111-8111-111111111111.a.preview.localhost:3400", "/new-page", 200);
+  assert.equal(new URL(merchantPreview.headers.get("x-middleware-rewrite")).pathname, "/preview/a/new-page");
+  await check("a1111111-1111-4111-8111-111111111111.a.preview.localhost:3400", "/preview/b/new-page", 404);
+  await check("not-a-uuid.a.preview.localhost:3400", "/", 404);
   const health = await check("unknown.localhost:3400", "/healthz", 200);
   assert.equal(health.headers.get("x-middleware-next"), "1");
   assert.equal(requests.length, beforeInvalid);
   const errors = [];
   t.mock.method(console, "error", (...args) => errors.push(args.join(" ")));
-  await check("c1.localhost", "/", 503);
+  await check("c1111111-1111-4111-8111-111111111111.localhost", "/", 503);
   failure = true;
-  await check("a1.localhost", "/", 503);
+  await check("a1111111-1111-4111-8111-111111111111.localhost", "/", 503);
   assert.ok(errors.some((message) => message.includes("Template is not installed")));
   assert.ok(errors.some((message) => message.includes("HTTP 503")));
   assert.ok(requests.every(([, pathname]) => pathname === "/sites/resolve"));

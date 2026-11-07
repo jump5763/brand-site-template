@@ -23,7 +23,10 @@ export function resolvePreviewRequest(host, pathname, baseDomain = "preview.loca
   const hostname = normalizeHostname(host);
   const suffix = `.${baseDomain}`;
   if (!hostname.endsWith(suffix)) return null;
-  const templateId = hostname.slice(0, -suffix.length);
+  const labels = hostname.slice(0, -suffix.length).split(".");
+  const templateId = labels.at(-1);
+  if (labels.length !== 1 && (labels.length !== 2 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(labels[0]))) return null;
+  const identity = { templateId, ...(labels.length === 2 ? { merchantId: labels[0] } : {}) };
   if (!templateIds.includes(templateId) || typeof pathname !== "string" || !pathname.startsWith("/")) return null;
   let decoded;
   try { decoded = decodeURIComponent(pathname); } catch { return null; }
@@ -31,9 +34,9 @@ export function resolvePreviewRequest(host, pathname, baseDomain = "preview.loca
   const prefix = `/preview/${templateId}`;
   if (decoded === "/sites" || decoded.startsWith("/sites/")) return null;
   if (decoded === "/preview" || decoded.startsWith("/preview/")) {
-    return decoded === prefix || decoded.startsWith(`${prefix}/`) ? { templateId, pathname: decoded } : null;
+    return decoded === prefix || decoded.startsWith(`${prefix}/`) ? { ...identity, pathname: decoded } : null;
   }
-  return { templateId, pathname: prefix + (pathname === "/" ? "" : pathname === "/sitemap.xml" ? "/sitemap-data" : pathname) };
+  return { ...identity, pathname: prefix + (pathname === "/" ? "" : pathname === "/sitemap.xml" ? "/sitemap-data" : pathname) };
 }
 
 /** The caller supplies an API-verified identity; this module performs no I/O. */
