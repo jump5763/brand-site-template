@@ -351,6 +351,8 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
             if (built.error) error.message = built.error;
             throw error;
           }
+          // A successful CLI distributed even when the build had only shared static assets.
+          context.distributionCompleted = true;
           if (built.runtimeId !== runtimeId || built.jobId !== requestId || context.publications.length !== selected.length) throw new Error("Build result identity or merchant count differs from fixed input");
           const seen = new Set();
           for (const publication of context.publications) {
@@ -400,7 +402,7 @@ export function createLocalJobRunner({ api, runtime, config, runner = runCommand
       result = request.kind === "APPLY_TEMPLATE" ? await applyTemplate(context) : await publishSite(context);
     } catch (error) {
       if (!error.phase) error.phase = stage;
-      if (error.partial === undefined) error.partial = context?.publications.some(item => item.uploaded > 0 || item.deleted > 0) || false;
+      if (error.partial === undefined) error.partial = context?.distributionCompleted === true || context?.publications.some(item => item.uploaded > 0 || item.deleted > 0) || false;
       result = { status: "FAILED", error: diagnostic(error) };
       // A never-started candidate cannot have been confirmed by this execution.
       if (request.kind === "APPLY_TEMPLATE" && (!context || !context.candidateStarted) && error.processState !== "unknown" && activeRuntimeId !== undefined) {

@@ -28,6 +28,13 @@ export async function applyTemplate(context) {
   const candidate = await context.commitRuntime(appDir);
   await context.progress("deploying");
   const previous = context.runtime.getCurrent();
+  if (previous?.exited && previous.runtimeId !== candidate.runtimeId) {
+    const previousId = previous.runtimeId;
+    const recordFact = context.recordRuntimeFact;
+    // Exit remains useful evidence even when the subsequent candidate startup fails.
+    void previous.exited.then(() => recordFact({ runtimeId: previousId, disposition: "retired", stopped: true, confirmation: "known" }),
+      () => { /* An unconfirmed exit never authorizes retirement. */ });
+  }
   context.candidateStarted = true;
   let candidateHandle;
   try {

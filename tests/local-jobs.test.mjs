@@ -25,7 +25,8 @@ async function fixture(t, {realHealthPort} = {}){
  await writeFile(path.join(app,'runtime.json'),JSON.stringify({runtimeId:'runtime',buildConfig}));
  const target={templateId:'a',sourceCommit:'b'.repeat(40),templateTreeHash:'c'.repeat(40),repositoryPath:'templates/a'};
  const installed={runtimeId:'runtime',sourceRoot:deployedSource,appDir:app,runtimeSourceCommit:sourceCommit,templateSources:{a:target,b:{...target,templateId:'b',repositoryPath:'templates/b'}}};
- let active=installed,current=installed;
+ const handle=candidate=>{const exit=deferred();return{...candidate,exited:exit.promise,finish:exit.resolve};};
+ let active=installed,current=handle(installed);
  const site={merchantId,templateId:'a',state:'ACTIVE',siteUrl:'http://merchant.localhost:3400',hostname:'merchant.localhost',contentRevision:'latest',document:{siteId:merchantId,siteUrl:'http://merchant.localhost:3400',value:'latest content'}};
  const controls={},calls=[],events=[],built=[];
  const api=async(method,route,body)=>{
@@ -49,8 +50,8 @@ async function fixture(t, {realHealthPort} = {}){
   assert.fail('Unexpected API '+route);
  };
  const runtime={getCurrent:()=>current,
-  switchTo:async(candidate,{verify})=>{events.push('switch');if(controls.startFails)throw Object.assign(new Error('start failed'),{stopped:true,processState:'stopped'});current=candidate;await verify();},
-  stop:async()=>{events.push('stop');if(controls.stopFails)throw new Error('unknown stop');current=null;return{stopped:true,processState:'stopped'};}};
+  switchTo:async(candidate,{verify})=>{events.push('switch');if(!controls.unknownPreviousExit)current?.finish?.();current=null;if(controls.startFails)throw Object.assign(new Error('start failed'),{stopped:true,processState:'stopped'});current=handle(candidate);await verify();return current;},
+  stop:async()=>{events.push('stop');if(controls.stopFails)throw new Error('unknown stop');current?.finish?.();current=null;return{stopped:true,processState:'stopped'};}};
  const runner=async(command,args,cwd,env)=>{
   if(command==='corepack')return;
   assert.equal(env.BUILD_AUDIT_DIR,undefined);assert.equal(env.PUBLISH_AUDIT_DIR,undefined);
@@ -146,7 +147,7 @@ test('confirmation outcomes have at most one readback and never restart an old p
   assert.equal(f.events.filter(e=>e==='switch').length,1);
   if(mode==='lost-success'){assert.equal(result.status,'SUCCEEDED');assert.equal(f.events.includes('stop'),false);}
   else{
-   assert.equal(result.status,'FAILED');assert.equal(result.error.confirmation,mode==='reject'?'rejected':'unknown');assert.equal(result.error.stopped,true);
+   assert.equal(result.status,'FAILED');assert.equal(result.error.partial,true);assert.equal(result.error.confirmation,mode==='reject'?'rejected':'unknown');assert.equal(result.error.stopped,true);
    if(mode==='unknown')await access(path.join(f.dataDir,'releases/candidate'));else await assert.rejects(access(path.join(f.dataDir,'releases/candidate')),{code:'ENOENT'});
    f.controls.confirm=undefined;const next=await f.apply('forward');assert.equal(next.status,'SUCCEEDED');
   }
@@ -187,4 +188,28 @@ test('interruption keeps working input until the compiler completes and then rel
  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'STOP_REQUESTED');assert.equal(f.events.includes('activate'),false);
  await assert.rejects(access(path.join(f.dataDir,'work/interrupted')),{code:'ENOENT'});
  assert.equal((await summary(f,'interrupted')).childrenExited,true);
+});
+
+
+test('a failed replacement retains previous exit evidence for the next forward deployment',async t=>{
+ for(const unknown of [false,true])await t.test(unknown?'unknown exit remains protected':'confirmed exit is reclaimed after forward confirmation',async t=>{
+  const f=await fixture(t);f.controls.empty=true;
+  const oldPage=path.join(f.dataDir,'artifacts/runtimes/runtime/sites/a/old/responses/page.html');
+  const shared=path.join(f.dataDir,'artifacts/_next/static/shared.js');
+  const neighbor=path.join(f.dataDir,'artifacts/runtimes/runtime-neighbor/keep');
+  for(const file of [oldPage,shared,neighbor]){await mkdir(path.dirname(file),{recursive:true});await writeFile(file,'keep');}
+  f.controls.startFails=true;f.controls.unknownPreviousExit=unknown;
+  const failed=await f.apply('failed-start');assert.equal(failed.status,'FAILED');assert.equal(failed.error.partial,true);
+  await access(path.join(f.dataDir,'releases/runtime/source/pnpm-lock.yaml'));await access(oldPage);
+  assert.equal(f.getActive().runtimeId,'runtime');
+  f.controls.startFails=false;
+  const forward=await f.apply('forward-after-start-failure');assert.equal(forward.status,'SUCCEEDED');
+  assert.equal(f.getActive().runtimeId,'forward-after-start-failure');
+  if(unknown){await access(path.join(f.dataDir,'releases/runtime'));await access(oldPage);}
+  else{
+   await assert.rejects(access(path.join(f.dataDir,'releases/runtime')),{code:'ENOENT'});
+   await assert.rejects(access(path.join(f.dataDir,'artifacts/runtimes/runtime')),{code:'ENOENT'});
+  }
+  await access(shared);await access(neighbor);await access(path.join(f.dataDir,'releases/forward-after-start-failure/app/runtime.json'));
+ });
 });

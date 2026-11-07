@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';import test from 'node:test';import http from 'node:http';import {mkdtemp,rm,mkdir,writeFile,readdir} from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {startLocalStack} from '../scripts/local-stack.mjs';
+import assert from 'node:assert/strict';import test from 'node:test';import http from 'node:http';import {mkdtemp,rm,mkdir,writeFile,readdir,readFile} from 'node:fs/promises';import {cleanupLocalData} from '../scripts/local-cleanup.mjs';import os from 'node:os';import path from 'node:path';import {startLocalStack} from '../scripts/local-stack.mjs';
 test('stack serves independent HTTP Builder and never queries persistent tasks or replays work',async(t)=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'http-stack-'));t.after(()=>rm(root,{recursive:true,force:true}));const calls=[];
  const server=http.createServer((req,res)=>{calls.push(req.url);res.setHeader('Content-Type','application/json');if(req.url==='/healthz')res.end('{"status":"ok"}');else if(req.url==='/site-runtime')res.end('{"activeRuntime":null}');else{res.statusCode=404;res.end('{}');}});
@@ -105,4 +105,52 @@ test('startup releases proven stopped work but preserves unknown remnants',async
  const evidence=path.join(f.root,'executions','stopped');await mkdir(evidence,{recursive:true});
  await writeFile(path.join(evidence,'result.json'),JSON.stringify({requestId:'stopped',childrenExited:true,status:'FAILED',endedAt:new Date().toISOString()}));
  const stack=await f.start();assert.deepEqual(await readdir(path.join(f.root,'work')),['unknown']);await stack.close();
+});
+
+
+test('idle maintenance owns the operation boundary until its captured cleanup facts are consumed',async t=>{
+ const f=await stackFixture(t);
+ const deferred=()=>{let resolve;return{promise:new Promise(r=>{resolve=r;}),resolve:()=>resolve()};};
+ const id='old-process-request',compileEntered=deferred(),compileRelease=deferred();
+ let gate,started=false;
+ const work=path.join(f.root,'work',id),record=path.join(f.root,'executions',id,'result.json');
+ t.mock.timers.enable({apis:['setInterval']});
+ const stack=await f.start({createRunner:()=>{
+  const execute=async request=>{
+   assert.equal(request.requestId,id);started=true;
+   await mkdir(work,{recursive:true});await writeFile(path.join(work,'input.json'),'new execution');
+   compileEntered.resolve();await compileRelease.promise;
+   assert.equal(await readFile(path.join(work,'input.json'),'utf8'),'new execution');
+   return{status:'SUCCEEDED'};
+  };
+  execute.maintenance=async()=>{
+   let stopped=[];
+   try{stopped=[JSON.parse(await readFile(record,'utf8')).requestId];}catch(error){if(error.code!=='ENOENT')throw error;}
+   const options={localDataDir:f.root,activeRuntimeId:'current-one',activeRequestIds:[],stoppedRequestIds:stopped};
+   const waiting=gate;
+   if(waiting){waiting.entered.resolve();await waiting.release.promise;}
+   return cleanupLocalData(options);
+  };
+  return execute;
+ }});
+ await mkdir(work,{recursive:true});await writeFile(path.join(work,'input.json'),'old stopped execution');
+ await mkdir(path.dirname(record),{recursive:true});await writeFile(record,JSON.stringify({requestId:id,status:'SUCCEEDED',childrenExited:true,endedAt:new Date().toISOString()}));
+ gate={entered:deferred(),release:deferred()};t.mock.timers.tick(60*60*1000);await gate.entered.promise;
+ stack.builder.submit({requestId:id,kind:'APPLY_TEMPLATE',target:{templateId:'a'}});
+ await new Promise(r=>setImmediate(r));assert.equal(started,false);assert.equal(stack.builder.get(id).status,'RUNNING');
+ gate.release.resolve();await compileEntered.promise;
+ assert.equal(await readFile(path.join(work,'input.json'),'utf8'),'new execution');
+ t.mock.timers.tick(60*60*1000);await new Promise(r=>setImmediate(r));
+ assert.equal(await readFile(path.join(work,'input.json'),'utf8'),'new execution');
+ compileRelease.resolve();await stack.builder.done;assert.equal(stack.builder.get(id).status,'SUCCEEDED');
+
+ gate={entered:deferred(),release:deferred()};t.mock.timers.tick(60*60*1000);await gate.entered.promise;
+ let launched=false;const startup=stack.startCurrent().then(result=>{launched=true;return result;});
+ await new Promise(r=>setImmediate(r));assert.equal(launched,false);
+ gate.release.resolve();assert.equal((await startup).runtimeId,'current-one');
+
+ gate={entered:deferred(),release:deferred()};t.mock.timers.tick(60*60*1000);await gate.entered.promise;
+ let closed=false;const close=stack.close().then(()=>{closed=true;});
+ await new Promise(r=>setImmediate(r));assert.equal(closed,false);
+ gate.release.resolve();await close;assert.equal(closed,true);
 });
