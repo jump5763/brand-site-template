@@ -116,6 +116,7 @@ async function executeFixed(options, dependencies = {}) {
   if (["build", "publish"].includes(mode) && !options.workRoot) throw new Error("--work-root is required for an execution");
   if (options.workRoot) await assertExecutionPath({ workRoot: options.workRoot, file: inputDir, label: "--input-dir" });
   let buildEnv = {}, output, work, result, failure;
+  let publicationCompleted = false;
   let stage = "input validation";
   try {
     if (mode === "publish") {
@@ -138,6 +139,7 @@ async function executeFixed(options, dependencies = {}) {
     if (mode === "publish" || env.ARTIFACT_DIR) {
       stage = "upload";
       publication = await publish({ nextDir: path.join(work, ".next"), artifactDir: requiredArtifactDir(env), sites: input.selected, runtimeId, jobId });
+      publicationCompleted = true;
     }
     result = { ...publication, status: mode === "build" ? "built" : "published", ...(output ? { appDir: output } : {}) };
     const auditRoot = mode === "publish" ? env.PUBLISH_AUDIT_DIR : env.BUILD_AUDIT_DIR;
@@ -149,7 +151,7 @@ async function executeFixed(options, dependencies = {}) {
     }
   } catch (cause) {
     failure = new Error(`${mode} ${scopeLabel(scope)} failed during ${stage}: ${cause.message}`, { cause });
-    Object.assign(failure, { phase: cause.phase || stage, objectPath: cause.objectPath, partial: cause.partial ?? Boolean(result?.publications?.length), code: cause.code || cause.cause?.code, publications: cause.publications || result?.publications || [] });
+    Object.assign(failure, { phase: cause.phase || stage, objectPath: cause.objectPath, partial: cause.partial ?? publicationCompleted, code: cause.code || cause.cause?.code, publications: cause.publications || result?.publications || [] });
   } finally {
     if (work) {
       try { await cleanup(work, { recursive: true, force: true }); }
@@ -158,7 +160,7 @@ async function executeFixed(options, dependencies = {}) {
         const prior = failure;
         failure = new Error(`${prior ? prior.message + "; " : ""}${mode} failed during cleanup: ${cause.message}`, { cause });
         Object.assign(failure, { phase: prior?.phase || "cleanup", objectPath: prior?.objectPath || work,
-          partial: prior?.partial ?? Boolean(result?.publications?.length), code: prior?.code || cause.code, publications });
+          partial: prior?.partial ?? publicationCompleted, code: prior?.code || cause.code, publications });
       }
     }
   }

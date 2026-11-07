@@ -31,7 +31,7 @@ test("empty merchant build packages runtime and previews, and distributes static
   const appDir = path.join(f.root, "app");
   const artifactDir = path.join(f.root, "artifacts");
   let work;
-  const result = await main([...args("build", f), "--output", appDir], { sourceRoot: f.sourceRoot, env: { ARTIFACT_DIR: artifactDir }, runner: async (command, _args, cwd) => {
+  const dependencies = { sourceRoot: f.sourceRoot, env: { ARTIFACT_DIR: artifactDir }, runner: async (command, _args, cwd) => {
     work = cwd;
     if (command === "corepack") return;
     await access(path.join(cwd, "src/app/healthz/route.ts"));
@@ -41,7 +41,8 @@ test("empty merchant build packages runtime and previews, and distributes static
     await put(cwd, ".next/server/app/placeholder", "");
     await put(cwd, ".next/prerender-manifest.json", '{"routes":{}}');
     await put(cwd, ".next/static/chunks/preview-123.js", "preview code");
-  } });
+  } };
+  const result = await main([...args("build", f), "--output", appDir], dependencies);
   assert.equal(result.appDir, await realpath(appDir));
   assert.deepEqual(result.publications, []);
   assert.equal(result.runtimeId, runtimeId);
@@ -54,6 +55,15 @@ test("empty merchant build packages runtime and previews, and distributes static
   await assert.rejects(access(work), { code: "ENOENT" });
   await access(f.inputDir);
   assert.ok(!(await readdir(f.root)).some(name => name.startsWith("brand-site-")));
+  await assert.rejects(main([...args("build", f), "--output", appDir], {
+    ...dependencies, cleanup: async () => { throw new Error("injected cleanup failure"); },
+  }), /during cleanup.*injected cleanup failure/);
+  const failed = JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8"));
+  assert.equal(failed.phase, "cleanup");
+  assert.equal(failed.partial, true);
+  assert.deepEqual(failed.publications, []);
+  await access(path.join(artifactDir, "_next/static/chunks/preview-123.js"));
+  await access(path.join(appDir, "runtime.json"));
 });
 
 test("content publication fixes disk input once and emits fixed object writer results without fetching API", async (t) => {
