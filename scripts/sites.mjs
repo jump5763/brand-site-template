@@ -226,6 +226,21 @@ function requiredArtifactDir(env) {
   return env.ARTIFACT_DIR;
 }
 
+/** Builder logs contain summaries; complete route/file sets stay in the handoff file. */
+export async function runCli(args = process.argv.slice(2), dependencies = {}) {
+  const result = await main(args, dependencies);
+  if (result) {
+    const output = parseArgs(args).resultFile ? {
+      runtimeId: result.runtimeId, jobId: result.jobId, publishId: result.publishId, status: result.status,
+      siteCount: result.sites?.length || 0, responseCount: result.responses || 0,
+      uploadedCount: (result.publications || []).reduce((count, item) => count + (item.uploaded || 0), 0),
+      deletedCount: (result.publications || []).reduce((count, item) => count + (item.deleted || 0), 0),
+    } : result;
+    console.log(JSON.stringify(output));
+  }
+  return result;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().then((result) => { if (result) console.log(JSON.stringify(result)); }).catch((error) => { console.error(error.message); process.exitCode = 1; });
+  runCli().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { access, readFile, realpath, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { parseArgs, main } from "../scripts/sites.mjs";
+import { parseArgs, main, runCli } from "../scripts/sites.mjs";
 import { normalizeScope } from "../scripts/content-input.mjs";
 import { installedTemplate } from "./helpers/installed-template.mjs";
 import { put, seedArtifacts } from "./helpers/artifacts.mjs";
@@ -73,14 +73,16 @@ test("content publication fixes disk input once and emits fixed object writer re
   const env = await deployed(f);
   let work, builds = 0;
   const title = f.document.pages[0].metadata.title;
-  const result = await main([...args("publish", f), "--site", f.config.id], { sourceRoot: f.sourceRoot, env, runner: async (command, _args, cwd, buildEnv) => {
+  const stdout = [];
+  t.mock.method(console, "log", value => stdout.push(value));
+  const result = await runCli([...args("publish", f), "--site", f.config.id], { sourceRoot: f.sourceRoot, env, runner: async (command, _args, cwd, buildEnv) => {
     work = cwd;
     assert.equal(buildEnv.CONTENT_API_URL, undefined);
     assert.equal(buildEnv.BRAND_SITE_BUILDING, "1");
     assert.equal(JSON.parse(await readFile(path.join(cwd, f.config.contentFile), "utf8")).pages[0].metadata.title, title);
     const later = structuredClone(f.document); later.pages[0].metadata.title = "saved after snapshot";
     await writeFile(path.join(f.inputDir, f.config.contentFile), JSON.stringify(later));
-    if (command !== "corepack") { builds++; await seedArtifacts(path.join(cwd, ".next"), { id: f.config.id, templateId: f.config.templateId }); }
+    if (command !== "corepack") { console.log("fixture native build output"); builds++; await seedArtifacts(path.join(cwd, ".next"), { id: f.config.id, templateId: f.config.templateId }); }
   } });
   assert.equal(builds, 1);
   assert.equal(result.status, "published");
@@ -89,6 +91,21 @@ test("content publication fixes disk input once and emits fixed object writer re
   assert.equal(result.publications[0].contentRevision, "saved-revision-one");
   assert.equal(result.publications[0].distributed, true);
   assert.equal(result.publications[0].siteId, f.config.id);
+  assert.equal(stdout[0], "fixture native build output");
+  const printed = JSON.parse(stdout.at(-1));
+  assert.equal(printed.runtimeId, runtimeId);
+  assert.equal(printed.jobId, jobId);
+  assert.equal(printed.status, "published");
+  assert.equal(printed.siteCount, 1);
+  assert.equal(printed.responseCount, result.responses);
+  assert.equal(printed.uploadedCount, result.publications[0].uploaded);
+  assert.doesNotMatch(stdout.at(-1), /"(?:publications|routes|files)"/);
+  const handoff = JSON.parse(await readFile(path.join(f.root, "result.json"), "utf8"));
+  assert.deepEqual(handoff, result);
+  assert.ok(handoff.publications[0].routes[0].files.length > 0);
+  const standalone = await runCli(["validate", "--input-dir", f.inputDir], { sourceRoot: f.sourceRoot });
+  assert.deepEqual(JSON.parse(stdout.at(-1)), standalone);
+  assert.deepEqual(standalone.sites, [f.config.id]);
   assert.ok(work.startsWith((await realpath(f.root)) + path.sep));
   await assert.rejects(access(work), { code: "ENOENT" });
   await access(f.inputDir);
