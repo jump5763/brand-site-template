@@ -117,3 +117,25 @@ test("host-owned public paths are rejected before saving or building", async (t)
     else await assert.rejects(validation, (error) => error.status === 422 && error.diagnostics.some((item) => item.ruleId === "PAGE_PATH_RESERVED" && item.pointer === `/pages/${document.pages.length - 1}/path`));
   }
 });
+
+
+test("merchant normalization only fills absent identity and returns an unchanged-input copy", async () => {
+  const { isMerchantId, normalizeMerchantDocument } = await import("../src/server/site-input.mjs");
+  const merchantId = "29742a52-d824-469b-a395-52084345b7ad";
+  assert.equal(isMerchantId(merchantId), true);
+  for (const value of [merchantId.toUpperCase(), "demo-site", merchantId.slice(1), 123, null]) assert.equal(isMerchantId(value), false);
+  const nested = { title: "saved" };
+  for (const document of [{ nested }, { siteId: merchantId, nested }]) {
+    const before = structuredClone(document);
+    const result = normalizeMerchantDocument({ merchantId, document });
+    assert.notEqual(result, document);
+    assert.equal(result.siteId, merchantId);
+    assert.equal(result.nested, nested);
+    assert.deepEqual(document, before);
+  }
+  for (const siteId of [null, "", undefined, 42, "other-site"]) {
+    const document = { siteId };
+    assert.throws(() => normalizeMerchantDocument({ merchantId, document }), { status: 422 });
+    assert.deepEqual(document, { siteId });
+  }
+});

@@ -34,6 +34,19 @@ function checkSiteId(siteId) {
   }
 }
 
+/** Merchant UUIDs are validated at trusted ingress, without changing their value. */
+export function isMerchantId(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
+}
+
+/** The caller has already established identity and parsed an object document. */
+export function normalizeMerchantDocument({ merchantId, document }) {
+  if (Object.hasOwn(document, "siteId") && document.siteId !== merchantId) {
+    throw invalid("SITE_ID_MISMATCH", "/siteId", "Document site identity mismatch");
+  }
+  return { ...document, siteId: merchantId };
+}
+
 export async function validateSiteInput({ sourceRoot, templateId, document, identity }) {
   if (typeof templateId !== "string" || !safeId.test(templateId)) {
     throw invalid("TEMPLATE_ID_INVALID", "/templateId", "Template ID is invalid");

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { isMerchantId } from "./site-input.mjs";
 
 const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 const inputRoot = () => process.env.BRAND_SITE_BUILD_INPUT_ROOT || process.cwd();
@@ -8,7 +9,7 @@ const inputRoot = () => process.env.BRAND_SITE_BUILD_INPUT_ROOT || process.cwd()
 /** Fixed task inputs are files, never a source-code import or online authority. */
 export function getBuildSites(root = inputRoot()) {
   const sites = JSON.parse(readFileSync(path.join(root, "build-input/sites.json"), "utf8"));
-  if (!Array.isArray(sites) || sites.some((site) => !site || typeof site.id !== "string" || !safeId.test(site.id) ||
+  if (!Array.isArray(sites) || sites.some((site) => !site || !isMerchantId(site.id) ||
     typeof site.templateId !== "string" || !safeId.test(site.templateId) || site.contentFile !== `sites/${site.id}/current.json`)) {
     throw new Error("Invalid fixed build input");
   }

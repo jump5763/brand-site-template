@@ -15,11 +15,14 @@ const close = (server) => new Promise((resolve) => server.close(resolve));
 test("API snapshot stays fixed and uses the installed template contract", async (t) => {
   const fixture = await installedTemplate(t, { merchant: true });
   const { sourceRoot, document, config } = fixture;
+  config.id = "a1111111-1111-4111-8111-111111111111";
+  config.contentFile = `sites/${config.id}/current.json`;
+  document.siteId = config.id;
   await cp(new URL("../scripts", import.meta.url), path.join(sourceRoot, "scripts"), { recursive: true });
   const { readApiCatalog, readApiDocuments, normalizeCatalog } = await import(pathToFileURL(path.join(sourceRoot, "scripts/content-input.mjs")).href);
   const dataDir = path.join(fixture.root, "api");
   await mkdir(dataDir);
-  await writeFile(path.join(dataDir, "catalog.json"), JSON.stringify({ sites: [{ siteId: config.id, templateId: config.templateId, siteUrl: config.siteUrl, public: true }] }));
+  await writeFile(path.join(dataDir, "catalog.json"), JSON.stringify({ sites: [{ merchantId: config.id, templateId: config.templateId, siteUrl: config.siteUrl, public: true }] }));
   const filename = path.join(dataDir, `${config.id}.json`);
   await writeFile(filename, JSON.stringify(document));
   const requests = [];
@@ -46,9 +49,9 @@ test("API snapshot stays fixed and uses the installed template contract", async 
   await assert.rejects(readApiDocuments(base, catalog, "test-only"), (error) => error.status === 422 && error.diagnostics.length > 0);
   for (const entries of [
     [{ templateId: "template-a", siteUrl: config.siteUrl }],
-    [{ siteId: "../x", templateId: "template-a", siteUrl: config.siteUrl }],
-    [{ siteId: config.id, templateId: "uninstalled", siteUrl: config.siteUrl }],
-    [config, config].map((site) => ({ ...site, siteId: site.id })),
+    [{ merchantId: "../x", templateId: "template-a", siteUrl: config.siteUrl }],
+    [{ merchantId: config.id, templateId: "uninstalled", siteUrl: config.siteUrl }],
+    [config, config].map((site) => ({ ...site, merchantId: site.id })),
   ]) assert.throws(() => normalizeCatalog(entries));
 });
 

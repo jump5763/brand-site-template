@@ -4,6 +4,6 @@ export function createSiteDocumentReader<T extends { siteId: string; siteUrl: st
   validate: (value: unknown) => T;
   isBuilding?: () => boolean;
   readSnapshot?: (templateId: string, siteId: string) => Promise<unknown>;
-  readPublic?: (siteId: string) => Promise<PublicDocument>;
+  readPublic?: (siteId: string, expected?: { templateId?: string; siteUrl?: string }) => Promise<PublicDocument>;
   resolve?: (hostname: string) => Promise<MerchantIdentity | null>;
 }): (siteId: string) => Promise<T>;

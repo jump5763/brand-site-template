@@ -1,5 +1,6 @@
 import http from "node:http";
 import https from "node:https";
+import { isMerchantId, normalizeMerchantDocument } from "./site-input.mjs";
 
 const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
@@ -57,7 +58,7 @@ function requestNativeJson(url, { token, timeoutMs }) {
 }
 
 function identity(value) {
-  if (!value || typeof value.siteId !== "string" || typeof value.templateId !== "string" || !safeId.test(value.siteId) || !safeId.test(value.templateId)) {
+  if (!value || !isMerchantId(value.merchantId) || typeof value.templateId !== "string" || !safeId.test(value.templateId)) {
     throw new SiteApiError("INVALID_RESPONSE", "Public content API: invalid merchant identity");
   }
   let url;
@@ -65,7 +66,7 @@ function identity(value) {
   if (!url || !["https:", "http:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
     throw new SiteApiError("INVALID_RESPONSE", "Public content API: invalid canonical URL");
   }
-  return { siteId: value.siteId, templateId: value.templateId, siteUrl: value.siteUrl };
+  return { merchantId: value.merchantId, siteId: value.merchantId, templateId: value.templateId, siteUrl: value.siteUrl };
 }
 
 export function createSiteApi({
@@ -98,19 +99,30 @@ export function createSiteApi({
       return merchant;
     },
 
-    async readPublicDocument(siteId) {
-      if (typeof siteId !== "string" || !safeId.test(siteId)) throw new SiteApiError("IDENTITY_MISMATCH", "Invalid requested site ID");
+    async readPublicDocument(siteId, expected = {}) {
+      if (!isMerchantId(siteId)) throw new SiteApiError("IDENTITY_MISMATCH", "Invalid requested site ID");
       const value = await read(`/sites/${encodeURIComponent(siteId)}/content`);
       if (value?.public === false) throw new SiteApiError("NOT_FOUND", "Site is not public", 404);
       if (value?.public !== true) throw new SiteApiError("INVALID_RESPONSE", "Public content API: public status is required");
-      const merchant = identity({ ...value.document, templateId: value.templateId });
+      const merchant = identity(value);
       if (merchant.siteId !== siteId) throw new SiteApiError("IDENTITY_MISMATCH", "Public content API: document identity mismatch");
-      return { templateId: value.templateId, document: value.document };
+      if ((expected.templateId !== undefined && merchant.templateId !== expected.templateId) ||
+          (expected.siteUrl !== undefined && merchant.siteUrl !== expected.siteUrl)) {
+        throw new SiteApiError("IDENTITY_MISMATCH", "Public content API: requested binding mismatch");
+      }
+      if (!value.document || typeof value.document !== "object" || Array.isArray(value.document)) {
+        throw new SiteApiError("INVALID_RESPONSE", "Public content API: expected document object");
+      }
+      let document;
+      try { document = normalizeMerchantDocument({ merchantId: merchant.merchantId, document: value.document }); }
+      catch { throw new SiteApiError("IDENTITY_MISMATCH", "Public content API: document identity mismatch"); }
+      if (document.siteUrl !== merchant.siteUrl) throw new SiteApiError("IDENTITY_MISMATCH", "Public content API: canonical URL mismatch");
+      return { merchantId: merchant.merchantId, templateId: merchant.templateId, siteUrl: merchant.siteUrl, document };
     },
 
     async listPublicSites(scope = { scope: "all" }) {
       let query = "";
-      if (scope.scope === "site" && typeof scope.siteId === "string" && safeId.test(scope.siteId)) query = `?siteId=${encodeURIComponent(scope.siteId)}`;
+      if (scope.scope === "site" && isMerchantId(scope.siteId)) query = `?merchantId=${encodeURIComponent(scope.siteId)}`;
       else if (scope.scope === "template" && typeof scope.templateId === "string" && safeId.test(scope.templateId)) query = `?templateId=${encodeURIComponent(scope.templateId)}`;
       else if (scope.scope !== "all") throw new SiteApiError("CONFIG", "Invalid publication scope");
       const value = await read(`/sites${query}`);
@@ -124,5 +136,5 @@ export function createSiteApi({
 }
 
 export const resolveMerchant = (hostname) => createSiteApi().resolveMerchant(hostname);
-export const readPublicDocument = (siteId) => createSiteApi().readPublicDocument(siteId);
+export const readPublicDocument = (siteId, expected) => createSiteApi().readPublicDocument(siteId, expected);
 export const listPublicSites = (scope) => createSiteApi().listPublicSites(scope);

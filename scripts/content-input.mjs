@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import templateIds from "../src/template-ids.json" with { type: "json" };
+import { isMerchantId, normalizeMerchantDocument } from "../src/server/site-input.mjs";
 import { createSiteApi } from "../src/server/site-api.mjs";
 
 const safeId = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
@@ -25,18 +26,18 @@ export function normalizeCatalog(entries, { allowEmpty = false, registeredTempla
   const ids = new Set();
   const hosts = new Set();
   return entries.map((entry) => {
-    if (!entry || typeof entry.siteId !== "string" || !safeId.test(entry.siteId) || !registeredTemplates.includes(entry.templateId)) throw new Error("Invalid site ID or unregistered template");
+    if (!entry || !isMerchantId(entry.merchantId) || !registeredTemplates.includes(entry.templateId)) throw new Error("Invalid site ID or unregistered template");
     if (entry.contentRevision != null && (typeof entry.contentRevision !== "string" || !safeId.test(entry.contentRevision))) throw new Error("Invalid content revision");
     const url = new URL(entry.siteUrl);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
-      throw new Error(`Invalid site URL: ${entry.siteId}`);
+      throw new Error(`Invalid site URL: ${entry.merchantId}`);
     }
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
-    if (ids.has(entry.siteId) || hosts.has(hostname)) throw new Error("Duplicate site ID or hostname");
-    ids.add(entry.siteId);
+    if (ids.has(entry.merchantId) || hosts.has(hostname)) throw new Error("Duplicate site ID or hostname");
+    ids.add(entry.merchantId);
     hosts.add(hostname);
-    return { id: entry.siteId, name: entry.name || entry.siteId, templateId: entry.templateId, hostname, siteUrl: entry.siteUrl,
-      contentFile: `sites/${entry.siteId}/current.json`, contentRevision: entry.contentRevision ?? null };
+    return { id: entry.merchantId, name: entry.name || entry.merchantId, templateId: entry.templateId, hostname, siteUrl: entry.siteUrl,
+      contentFile: `sites/${entry.merchantId}/current.json`, contentRevision: entry.contentRevision ?? null };
   });
 }
 
@@ -52,19 +53,22 @@ export async function readApiCatalog(baseUrl, token, requestedScope = { scope: "
 export async function validateDocuments(documents, { sourceRoot = defaultSourceRoot } = {}) {
   const registered = JSON.parse(await readFile(path.join(sourceRoot, "src/template-ids.json"), "utf8"));
   const { validateSiteInput } = await import(pathToFileURL(path.join(sourceRoot, "src/server/site-input.mjs")).href);
-  await Promise.all(documents.map(async ({ config, document }) => {
+  return Promise.all(documents.map(async (entry) => {
+    const { config, document } = entry;
     if (!registered.includes(config.templateId)) throw new Error(`Unregistered template: ${config.templateId}`);
-    await validateSiteInput({ sourceRoot, templateId: config.templateId, document,
+    if (!isMerchantId(config.id) || !document || typeof document !== "object" || Array.isArray(document)) throw new Error("Invalid merchant document input");
+    const normalized = normalizeMerchantDocument({ merchantId: config.id, document });
+    const validated = await validateSiteInput({ sourceRoot, templateId: config.templateId, document: normalized,
       identity: { siteId: config.id, siteUrl: config.siteUrl || document.siteUrl, templateId: config.templateId } });
-    if (new URL(document.siteUrl).hostname.toLowerCase().replace(/\.$/, "") !== config.hostname) throw new Error(`Site identity mismatch: ${config.id}`);
+    if (new URL(validated.siteUrl).hostname.toLowerCase().replace(/\.$/, "") !== config.hostname) throw new Error(`Site identity mismatch: ${config.id}`);
+    return { config, document: validated };
   }));
-  return documents;
 }
 
 export async function readApiDocuments(baseUrl, selected, token) {
   const api = createSiteApi({ baseUrl, token });
   const documents = await Promise.all(selected.map(async (config) => {
-    const result = await api.readPublicDocument(config.id);
+    const result = await api.readPublicDocument(config.id, { templateId: config.templateId, siteUrl: config.siteUrl });
     if (result.templateId !== config.templateId) throw new Error(`Template mismatch: ${config.id}; application deployment required`);
     return { config, document: result.document };
   }));
@@ -83,7 +87,7 @@ export async function readFixedInput({ sourceRoot = defaultSourceRoot, inputDir,
   const registeredTemplates = JSON.parse(await readFile(path.join(sourceRoot, "src/template-ids.json"), "utf8"));
   const raw = JSON.parse(await readFile(path.join(inputDir, "sites.json"), "utf8"));
   if (!Array.isArray(raw) || raw.some((site) => site?.contentFile !== `sites/${site?.id}/current.json`)) throw new Error("Invalid fixed sites.json");
-  const catalog = normalizeCatalog(raw.map((site) => ({ ...site, siteId: site.id })), { allowEmpty: true, registeredTemplates });
+  const catalog = normalizeCatalog(raw.map((site) => ({ ...site, merchantId: site.id })), { allowEmpty: true, registeredTemplates });
   if (catalog.some((site, index) => site.hostname !== raw[index].hostname)) throw new Error("Fixed input hostname mismatch");
   const selected = selectCatalogScope(catalog, scope);
   const documents = await readLocalDocumentsForInput(sourceRoot, inputDir, selected);
@@ -108,7 +112,7 @@ async function readLocalDocumentsForInput(sourceRoot, inputDir, selected) {
 export async function readBuildCatalog(appDir) {
   if (!appDir) throw new Error("APP_DIR is required for artifact upload");
   const catalog = JSON.parse(await readFile(path.join(appDir, "build-input/sites.json"), "utf8"));
-  return normalizeCatalog(catalog.map((site) => ({ ...site, siteId: site.id })));
+  return normalizeCatalog(catalog.map((site) => ({ ...site, merchantId: site.id })));
 }
 
 export function selectCatalogScope(catalog, requestedScope) {

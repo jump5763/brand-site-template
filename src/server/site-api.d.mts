@@ -1,10 +1,13 @@
 export interface MerchantIdentity {
+  merchantId: string;
   siteId: string;
   templateId: string;
   siteUrl: string;
 }
 export type PublicationScope = { scope: "all" } | { scope: "template"; templateId: string } | { scope: "site"; siteId: string };
 export interface PublicDocument {
+  merchantId: string;
+  siteUrl: string;
   templateId: string;
   document: { siteId: string; siteUrl: string; [key: string]: unknown };
 }
@@ -15,7 +18,7 @@ export class SiteApiError extends Error {
 }
 export interface SiteApi {
   resolveMerchant(hostname: string): Promise<MerchantIdentity | null>;
-  readPublicDocument(siteId: string): Promise<PublicDocument>;
+  readPublicDocument(siteId: string, expected?: { templateId?: string; siteUrl?: string }): Promise<PublicDocument>;
   listPublicSites(scope?: PublicationScope): Promise<MerchantIdentity[]>;
 }
 export function createSiteApi(options?: {
